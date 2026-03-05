@@ -1,12 +1,12 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { AffinityClient } from "./affinity/client.js";
+import { AffinityClient, AffinityClientOptions } from "./affinity/client.js";
 import { PeopleApi } from "./affinity/people.js";
 import { OrganizationsApi } from "./affinity/organizations.js";
 import { registerPeopleTools } from "./tools/people.js";
 import { registerOrganizationTools } from "./tools/organizations.js";
 
-export function createServer(apiKey: string): McpServer {
-  const client = new AffinityClient(apiKey);
+export function createServer(apiKey: string, options?: AffinityClientOptions): McpServer {
+  const client = new AffinityClient(apiKey, options);
   const peopleApi = new PeopleApi(client);
   const orgsApi = new OrganizationsApi(client);
 

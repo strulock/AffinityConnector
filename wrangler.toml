@@ -8,7 +8,7 @@ routes = [
 ]
 
 [vars]
-AFFINITY_V1_BASE_URL = "https://api.affinity.co/v1"
+AFFINITY_V1_BASE_URL = "https://api.affinity.co"
 AFFINITY_V2_BASE_URL = "https://api.affinity.co/v2"
 
 # Secrets (set via: wrangler secret put AFFINITY_API_KEY)

@@ -57,10 +57,12 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
 
   const transport = new WebStandardStreamableHTTPServerTransport({
     // Stateless mode: no sessionIdGenerator. Each request is independent.
-    // Suitable for Cloudflare Workers where no per-session state is maintained.
   });
 
-  const server = createServer(env.AFFINITY_API_KEY);
+  const server = createServer(env.AFFINITY_API_KEY, {
+    v1BaseUrl: env.AFFINITY_V1_BASE_URL,
+    v2BaseUrl: env.AFFINITY_V2_BASE_URL,
+  });
   await server.connect(transport);
 
   return withCors(await transport.handleRequest(request));
