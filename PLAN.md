@@ -54,15 +54,15 @@ User (Claude Desktop / claude.ai)
 ## MCP Tools to Expose
 
 ### People & Organizations
-- `search_people` — search contacts by name, email, domain
-- `get_person` — full profile + interaction history
-- `search_organizations` — search companies
-- `get_organization` — full org profile + associated people
+- `search_people` — search contacts by name, email, domain ✔
+- `get_person` — full profile + interaction history ✔
+- `search_organizations` — search companies ✔
+- `get_organization` — full org profile + associated people ✔
 
 ### Lists & Opportunities
-- `get_lists` — list all Affinity lists
-- `get_list_entries` — entries in a list (deals, contacts, orgs)
-- `get_opportunities` — pipeline/deal data
+- `get_lists` — list all Affinity lists ✔
+- `get_list_entries` — entries in a list (deals, contacts, orgs) ✔
+- `get_field_values` — custom field values for a list entry ✔
 
 ### Notes & Activity
 - `get_notes` — notes on a person or org
@@ -96,10 +96,11 @@ User (Claude Desktop / claude.ai)
 - `AFFINITY_API_KEY` secret set; Worker live at `https://affinity.trulock.com/mcp`
 - Connected and returning data in claude.ai
 
-### Phase 2 — Lists & Pipeline
-- List enumeration and entry retrieval
-- Opportunity/deal data
-- Field values (custom fields support)
+### Phase 2 — Lists & Pipeline ✔ COMPLETE
+- `src/affinity/lists.ts`: `ListsApi` with `getLists`, `getListEntries`, `getFieldValues` (v1)
+- `src/tools/lists.ts`: `get_lists`, `get_list_entries`, `get_field_values` tools
+- New types: `AffinityOpportunity`, `AffinityListEntry`, `AffinityField`, `AffinityFieldValue`
+- Opportunities accessible via list entries (entity_type 8) — no separate tool needed
 
 ### Phase 3 — Notes & Activity
 - Read notes from records
