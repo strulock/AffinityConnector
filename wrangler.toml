@@ -3,6 +3,10 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat"]
 
+routes = [
+  { pattern = "affinity.trulock.com", custom_domain = true }
+]
+
 [vars]
 AFFINITY_V1_BASE_URL = "https://api.affinity.co/v1"
 AFFINITY_V2_BASE_URL = "https://api.affinity.co/v2"
