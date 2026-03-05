@@ -39,8 +39,8 @@ export class AffinityClient {
 
   constructor(apiKey: string, options?: AffinityClientOptions) {
     if (!apiKey) throw new AffinityAuthError("AFFINITY_API_KEY is required.");
-    // Affinity HTTP Basic auth: empty username, API key as password
-    this.authHeader = "Basic " + btoa(":" + apiKey);
+    // Affinity supports both Basic and Bearer auth; Bearer is simpler on the edge.
+    this.authHeader = "Bearer " + apiKey;
     this.v1BaseUrl = options?.v1BaseUrl ?? "https://api.affinity.co";
     this.v2BaseUrl = options?.v2BaseUrl ?? "https://api.affinity.co/v2";
   }
