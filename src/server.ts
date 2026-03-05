@@ -4,6 +4,8 @@ import { PeopleApi } from "./affinity/people.js";
 import { OrganizationsApi } from "./affinity/organizations.js";
 import { registerPeopleTools } from "./tools/people.js";
 import { registerOrganizationTools } from "./tools/organizations.js";
+import { ListsApi } from "./affinity/lists.js";
+import { registerListTools } from "./tools/lists.js";
 
 export function createServer(apiKey: string, options?: AffinityClientOptions): McpServer {
   const client = new AffinityClient(apiKey, options);
@@ -15,8 +17,11 @@ export function createServer(apiKey: string, options?: AffinityClientOptions): M
     version: "0.1.0",
   });
 
+  const listsApi = new ListsApi(client);
+
   registerPeopleTools(server, peopleApi);
   registerOrganizationTools(server, orgsApi);
+  registerListTools(server, listsApi);
 
   return server;
 }

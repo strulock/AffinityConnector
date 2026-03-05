@@ -67,3 +67,42 @@ export interface AffinityPaginatedResponse<T> {
   data: T[];
   next_page_token?: string | null;
 }
+
+export interface AffinityOpportunity {
+  id: number;
+  name: string;
+  person_ids: number[];
+  organization_ids: number[];
+  list_entries: AffinityListEntryRef[];
+  created_at: string;
+}
+
+export interface AffinityListEntry {
+  id: number;
+  list_id: number;
+  entity_id: number;
+  entity_type: number; // 0 = Person, 1 = Organization, 8 = Opportunity
+  entity: AffinityPerson | AffinityOrganization | AffinityOpportunity;
+  creator_id: number | null;
+  created_at: string;
+}
+
+export interface AffinityField {
+  id: number;
+  name: string;
+  list_id: number | null;
+  value_type: number;
+  allows_multiple: boolean;
+  is_required: boolean;
+  is_read_only: boolean;
+}
+
+export interface AffinityFieldValue {
+  id: number;
+  field_id: number;
+  field?: AffinityField | null;
+  entity_type: number;
+  entity_id: number;
+  list_entry_id: number | null;
+  value: unknown;
+}
