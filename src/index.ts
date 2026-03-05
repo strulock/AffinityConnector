@@ -7,12 +7,39 @@ export interface Env {
   AFFINITY_V2_BASE_URL?: string;
 }
 
+// Claude.ai connects from the browser, so CORS is required.
+const CORS_HEADERS: Record<string, string> = {
+  "Access-Control-Allow-Origin": "https://claude.ai",
+  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, mcp-session-id, last-event-id",
+  "Access-Control-Expose-Headers": "mcp-session-id",
+  "Access-Control-Max-Age": "86400",
+};
+
+function withCors(response: Response): Response {
+  const headers = new Headers(response.headers);
+  for (const [k, v] of Object.entries(CORS_HEADERS)) headers.set(k, v);
+  return new Response(response.body, { status: response.status, headers });
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const { pathname } = new URL(request.url);
 
+    // CORS preflight
+    if (request.method === "OPTIONS") {
+      return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+
     if (pathname === "/mcp") {
       return handleMcp(request, env);
+    }
+
+    // MCP auth discovery endpoint (RFC 9728).
+    // No authorization_servers means no OAuth required.
+    if (pathname === "/.well-known/oauth-protected-resource") {
+      const { origin } = new URL(request.url);
+      return Response.json({ resource: origin }, { headers: CORS_HEADERS });
     }
 
     if (pathname === "/health") {
@@ -25,7 +52,7 @@ export default {
 
 async function handleMcp(request: Request, env: Env): Promise<Response> {
   if (!env.AFFINITY_API_KEY) {
-    return new Response("AFFINITY_API_KEY secret is not configured.", { status: 500 });
+    return withCors(new Response("AFFINITY_API_KEY secret is not configured.", { status: 500 }));
   }
 
   const transport = new WebStandardStreamableHTTPServerTransport({
@@ -36,5 +63,5 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
   const server = createServer(env.AFFINITY_API_KEY);
   await server.connect(transport);
 
-  return transport.handleRequest(request);
+  return withCors(await transport.handleRequest(request));
 }
