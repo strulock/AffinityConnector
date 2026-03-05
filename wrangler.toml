@@ -1,0 +1,11 @@
+name = "affinity-connector"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+AFFINITY_V1_BASE_URL = "https://api.affinity.co/v1"
+AFFINITY_V2_BASE_URL = "https://api.affinity.co/v2"
+
+# Secrets (set via: wrangler secret put AFFINITY_API_KEY)
+# AFFINITY_API_KEY

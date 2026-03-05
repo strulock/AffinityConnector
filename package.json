@@ -1,0 +1,20 @@
+{
+  "name": "affinity-connector",
+  "version": "0.1.0",
+  "description": "MCP server connecting Affinity CRM to Claude",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "type-check": "tsc --noEmit"
+  },
+  "license": "GPL-3.0",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.27.1"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260305.1",
+    "typescript": "^5.7.0",
+    "wrangler": "^4.70.0"
+  }
+}
