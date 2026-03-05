@@ -87,13 +87,14 @@ User (Claude Desktop / claude.ai)
 ## Phased Roadmap
 
 ### Phase 1 — Foundation (MVP) ✔ COMPLETE
-- `wrangler.toml` with `nodejs_compat`, base URL vars, secret annotation
-- `src/affinity/client.ts`: `fetch`-based, HTTP Basic auth, typed error classes, exponential backoff on 429, v1/v2 routing
-- `src/index.ts`: Cloudflare Workers fetch handler, Streamable HTTP transport (stateless), `/mcp` and `/health` routes
-- `src/server.ts`: accepts `apiKey` param; no `process.env` dependency
+- `wrangler.toml` with `nodejs_compat`, base URL vars, secret annotation; custom domain `affinity.trulock.com`
+- `src/affinity/client.ts`: `fetch`-based, Bearer auth, typed error classes (`AffinityAuthError`, `PermissionError`, `NotFoundError`, `RateLimitError`, `ServerError`), exponential backoff on 429, v1/v2 routing
+- `src/index.ts`: Cloudflare Workers fetch handler, Streamable HTTP transport (stateless), `/mcp`, `/health`, and `/.well-known/oauth-protected-resource` routes; CORS headers for claude.ai browser client
+- `src/server.ts`: accepts `apiKey` + base URL options; no `process.env` dependency
 - MCP tools: `search_people`, `get_person`, `search_organizations`, `get_organization`
-- TypeScript compiles clean against `@cloudflare/workers-types`
-- **Remaining before go-live**: set `AFFINITY_API_KEY` secret, configure Cloudflare Access policy
+- GitHub Actions CI/CD: type-check → `wrangler deploy` → `wrangler secret put` on every push to `main`
+- `AFFINITY_API_KEY` secret set; Worker live at `https://affinity.trulock.com/mcp`
+- Connected and returning data in claude.ai
 
 ### Phase 2 — Lists & Pipeline
 - List enumeration and entry retrieval
@@ -128,7 +129,7 @@ User (Claude Desktop / claude.ai)
 - The modern MCP transport (introduced 2025); replaces SSE
 - Stateless request/response — natural fit for Workers (no Durable Objects needed)
 - Supported by Claude Desktop and claude.ai
-- MCP endpoint: `https://<worker-name>.<account>.workers.dev/mcp`
+- MCP endpoint: `https://affinity.trulock.com/mcp`
 
 ### Authentication: Cloudflare Access
 - Protects the Worker URL at the network layer — no auth code to write
@@ -142,6 +143,11 @@ User (Claude Desktop / claude.ai)
 - Never committed to source control; no `.env` file in production
 - Non-sensitive config (e.g. API base URLs) in `wrangler.toml` as `[vars]`
 
+### CI/CD: GitHub Actions
+- Workflow at `.github/workflows/deploy.yml` triggers on every push to `main`
+- Steps: checkout → `npm ci` → type-check → `wrangler deploy` → `wrangler secret put AFFINITY_API_KEY`
+- Requires two GitHub repo secrets: `CLOUDFLARE_API_TOKEN` and `AFFINITY_API_KEY`
+
 ### Configuration (`wrangler.toml`)
 ```toml
 name = "affinity-connector"
@@ -149,7 +155,7 @@ main = "src/index.ts"
 compatibility_date = "2025-01-01"
 
 [vars]
-AFFINITY_V1_BASE_URL = "https://api.affinity.co/v1"
+AFFINITY_V1_BASE_URL = "https://api.affinity.co"
 AFFINITY_V2_BASE_URL = "https://api.affinity.co/v2"
 
 # AFFINITY_API_KEY — set via: wrangler secret put AFFINITY_API_KEY
@@ -159,7 +165,7 @@ AFFINITY_V2_BASE_URL = "https://api.affinity.co/v2"
 
 ## Key Affinity API Details
 
-- **Auth**: HTTP Basic auth — API key as password, empty username
+- **Auth**: Bearer auth — API key as Bearer token (Authorization: Bearer <key>)
 - **Rate limits**: ~900 req/min (standard)
 - **Docs**: https://affinity.co/documentation
 
@@ -176,7 +182,7 @@ Use whichever version exposes the richer or more reliable data for each domain:
 | Interactions | v1 | Only version available |
 | Relationship intelligence | v1 | Strength scores, intro paths |
 
-- **v1 base URL**: `https://api.affinity.co/v1/...`
+- **v1 base URL**: `https://api.affinity.co/...`
 - **v2 base URL**: `https://api.affinity.co/v2/...`
 - The API client should support both base paths and document which version each method uses.
 - If Affinity expands v2 coverage over time, prefer migrating to v2 for consistency.
