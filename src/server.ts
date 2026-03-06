@@ -13,6 +13,8 @@ import { NotesApi } from "./affinity/notes.js";
 import { registerNotesTools } from "./tools/notes.js";
 import { IntelligenceApi } from "./affinity/intelligence.js";
 import { registerIntelligenceTools } from "./tools/intelligence.js";
+import { FieldsApi } from "./affinity/fields.js";
+import { registerFieldTools } from "./tools/fields.js";
 
 export function createServer(apiKey: string, options?: AffinityClientOptions): McpServer {
   const client = new AffinityClient(apiKey, options);
@@ -21,6 +23,7 @@ export function createServer(apiKey: string, options?: AffinityClientOptions): M
   const listsApi = new ListsApi(client);
   const notesApi = new NotesApi(client);
   const intelligenceApi = new IntelligenceApi(client);
+  const fieldsApi = new FieldsApi(client);
 
   const server = new McpServer({
     name: "affinity-connector",
@@ -33,6 +36,7 @@ export function createServer(apiKey: string, options?: AffinityClientOptions): M
   registerNotesTools(server, notesApi);
   // Intelligence tools cross-reference people, orgs, and notes to build intro paths and summaries.
   registerIntelligenceTools(server, intelligenceApi, peopleApi, orgsApi, notesApi);
+  registerFieldTools(server, fieldsApi);
 
   return server;
 }

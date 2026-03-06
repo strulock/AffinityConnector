@@ -136,3 +136,14 @@ export interface AffinityRelationshipStrength {
   strength: number; // 0–100
   last_activity_date: string | null;
 }
+
+export interface AffinityFieldValueChange {
+  id: number;
+  field_id: number;
+  entity_id: number | null;
+  entity_type: number | null; // 0 = person, 1 = organization, 8 = opportunity
+  list_entry_id: number | null;
+  value: unknown;        // the new value after this change
+  changed_by_id: number;
+  changed_at: string;
+}

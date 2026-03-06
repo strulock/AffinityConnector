@@ -123,7 +123,7 @@ User (Claude Desktop / claude.ai)
 - `README.md`: full tool reference, claude.ai + Claude Desktop connection instructions, deployment guide
 
 ### Phase 6 — Test Suite ✔ COMPLETE
-- Framework: **Vitest** with `@vitest/coverage-v8`; 126 tests across 14 test files
+- Framework: **Vitest** with `@vitest/coverage-v8`; 126 tests across 14 test files (157 tests as of Phase 7)
 - `test/helpers/kv-mock.ts`: in-memory `KVNamespace` mock; `test/helpers/mock-server.ts`: `McpServer` mock that captures and invokes tool handlers directly
 - Coverage by layer:
   - `test/cache.test.ts` — `KVCache` (no-op, hit, miss, invalid JSON, TTL)
@@ -136,19 +136,13 @@ User (Claude Desktop / claude.ai)
 - Achieved: **98.8% statements, 90.4% branches, 97.1% functions, 99.7% lines**
 - CI pipeline updated: `type-check → test:coverage → deploy`
 
-### Phase 7 — Field Intelligence (Read)
-
-Prerequisite for all write phases: expose field metadata so Claude can discover field names and IDs before attempting to read or write values.
-
-**New API classes:**
-- `src/affinity/fields.ts`: `FieldsApi` with `getFields`, `getPersonFields`, `getOrganizationFields`, `getListFields`, `getFieldValueChanges` (v1)
-
-**New MCP tools (`src/tools/fields.ts`):**
-- `get_field_definitions` — list all custom field definitions (global + list-specific), with name, type, and allowed values; accepts optional `list_id` filter
-- `get_list_fields` — fields available on a specific list (v1 `/fields?list_id=` or v2 `GET /v2/lists/{id}/fields`)
-- `get_field_value_changes` — audit trail of changes to a field value over time; accepts `field_id` and optional `entity_id`/`list_entry_id`
-
-**New types:** `AffinityFieldDefinition`, `AffinityFieldValueChange`
+### Phase 7 — Field Intelligence (Read) ✔ COMPLETE
+- `src/affinity/fields.ts`: `FieldsApi` with `getFields`, `getPersonFields`, `getOrganizationFields`, `getFieldValueChanges` (v1)
+- `src/tools/fields.ts`: `get_field_definitions` (scope enum: all/person/organization/list + optional `list_id`), `get_field_value_changes` tools
+- New types in `types.ts`: `AffinityField`, `AffinityFieldValueChange`
+- Cache: field definitions at 10 min TTL (`fields: 600`); field value changes not cached (live audit data)
+- `get_field_definitions` exposes field ID, name, value type (Text/Number/Date/Location/Person/Organization/Dropdown), scope (global vs list), and constraint flags (required, multi-value, read-only)
+- Wired into `server.ts`; 17 new tests → 157 total passing
 
 ---
 
