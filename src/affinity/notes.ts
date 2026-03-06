@@ -1,4 +1,5 @@
 import { AffinityClient } from './client.js';
+import { CACHE_TTL } from '../cache.js';
 import type { AffinityNote, AffinityInteraction } from './types.js';
 
 export class NotesApi {
@@ -12,12 +13,18 @@ export class NotesApi {
     page_token?: string;
   }): Promise<{ notes: AffinityNote[]; nextPageToken?: string }> {
     const { limit = 25, page_token, ...filters } = params;
+    const cacheKey = `notes:${JSON.stringify(filters)}:${limit}:${page_token ?? ''}`;
+    const cached = await this.client.cache.get<{ notes: AffinityNote[] }>(cacheKey);
+    if (cached) return cached;
+
     const queryParams: Record<string, unknown> = { page_size: limit, ...filters };
     if (page_token) queryParams.page_token = page_token;
 
     // v1 /notes returns an array directly
     const result = await this.client.get<AffinityNote[]>('/notes', queryParams);
-    return { notes: Array.isArray(result) ? result : [] };
+    const response = { notes: Array.isArray(result) ? result : [] };
+    await this.client.cache.set(cacheKey, response, CACHE_TTL.notes);
+    return response;
   }
 
   async createNote(params: {
@@ -43,11 +50,17 @@ export class NotesApi {
     page_token?: string;
   }): Promise<{ interactions: AffinityInteraction[]; nextPageToken?: string }> {
     const { limit = 25, page_token, ...filters } = params;
+    const cacheKey = `interactions:${JSON.stringify(filters)}:${limit}:${page_token ?? ''}`;
+    const cached = await this.client.cache.get<{ interactions: AffinityInteraction[] }>(cacheKey);
+    if (cached) return cached;
+
     const queryParams: Record<string, unknown> = { page_size: limit, ...filters };
     if (page_token) queryParams.page_token = page_token;
 
     // v1 /interactions returns an array directly
     const result = await this.client.get<AffinityInteraction[]>('/interactions', queryParams);
-    return { interactions: Array.isArray(result) ? result : [] };
+    const response = { interactions: Array.isArray(result) ? result : [] };
+    await this.client.cache.set(cacheKey, response, CACHE_TTL.interactions);
+    return response;
   }
 }

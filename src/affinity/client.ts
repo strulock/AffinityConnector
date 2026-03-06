@@ -1,3 +1,5 @@
+import { KVCache } from '../cache.js';
+
 // Typed error classes for Affinity API failures
 
 export class AffinityAuthError extends Error {
@@ -30,12 +32,14 @@ export class AffinityServerError extends Error {
 export interface AffinityClientOptions {
   v1BaseUrl?: string;
   v2BaseUrl?: string;
+  cache?: KVNamespace;
 }
 
 export class AffinityClient {
   private readonly v1BaseUrl: string;
   private readonly v2BaseUrl: string;
   private readonly authHeader: string;
+  readonly cache: KVCache;
 
   constructor(apiKey: string, options?: AffinityClientOptions) {
     if (!apiKey) throw new AffinityAuthError("AFFINITY_API_KEY is required.");
@@ -43,6 +47,7 @@ export class AffinityClient {
     this.authHeader = "Bearer " + apiKey;
     this.v1BaseUrl = options?.v1BaseUrl ?? "https://api.affinity.co";
     this.v2BaseUrl = options?.v2BaseUrl ?? "https://api.affinity.co/v2";
+    this.cache = new KVCache(options?.cache);
   }
 
   async get<T>(path: string, params?: Record<string, unknown>, version: "v1" | "v2" = "v1"): Promise<T> {

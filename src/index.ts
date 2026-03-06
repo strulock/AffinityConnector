@@ -5,6 +5,7 @@ export interface Env {
   AFFINITY_API_KEY: string;
   AFFINITY_V1_BASE_URL?: string;
   AFFINITY_V2_BASE_URL?: string;
+  AFFINITY_CACHE: KVNamespace;
 }
 
 // Claude.ai connects from the browser, so CORS is required.
@@ -62,6 +63,7 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
   const server = createServer(env.AFFINITY_API_KEY, {
     v1BaseUrl: env.AFFINITY_V1_BASE_URL,
     v2BaseUrl: env.AFFINITY_V2_BASE_URL,
+    cache: env.AFFINITY_CACHE,
   });
   await server.connect(transport);
 

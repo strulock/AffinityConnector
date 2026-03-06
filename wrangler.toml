@@ -11,5 +11,9 @@ routes = [
 AFFINITY_V1_BASE_URL = "https://api.affinity.co"
 AFFINITY_V2_BASE_URL = "https://api.affinity.co/v2"
 
+[[kv_namespaces]]
+binding = "AFFINITY_CACHE"
+id = "1413d1000c9a4911acae52b3ce49aaa8"
+
 # Secrets (set via: wrangler secret put AFFINITY_API_KEY)
 # AFFINITY_API_KEY
