@@ -4,3 +4,4 @@ dist/
 .dev.vars
 *.js.map
 .wrangler/
+coverage/
