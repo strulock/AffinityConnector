@@ -59,10 +59,22 @@ User (Claude Desktop / claude.ai)
 - `search_organizations` — search companies ✔
 - `get_organization` — full org profile + associated people ✔
 
-### Lists & Opportunities
+### Lists & Field Values
 - `get_lists` — list all Affinity lists ✔
 - `get_list_entries` — entries in a list (deals, contacts, orgs) ✔
 - `get_field_values` — custom field values for a list entry ✔
+- `set_field_value` — create or update a field value on a list entry ✔
+- `delete_field_value` — delete a field value by ID ✔
+
+### Field Definitions
+- `get_field_definitions` — list field schemas (name, type, constraints) ✔
+- `get_field_value_changes` — audit trail of field mutations ✔
+
+### Opportunities
+- `search_opportunities` — search/list deals by name ✔
+- `get_opportunity` — full opportunity detail ✔
+- `create_opportunity` — create a new deal ✔
+- `update_opportunity` — rename or re-associate a deal ✔
 
 ### Notes & Activity
 - `get_notes` — notes on a person or org ✔
@@ -123,7 +135,7 @@ User (Claude Desktop / claude.ai)
 - `README.md`: full tool reference, claude.ai + Claude Desktop connection instructions, deployment guide
 
 ### Phase 6 — Test Suite ✔ COMPLETE
-- Framework: **Vitest** with `@vitest/coverage-v8`; 126 tests across 14 test files (166 tests as of Phase 8)
+- Framework: **Vitest** with `@vitest/coverage-v8`; 126 tests across 14 test files (187 tests as of Phase 9)
 - `test/helpers/kv-mock.ts`: in-memory `KVNamespace` mock; `test/helpers/mock-server.ts`: `McpServer` mock that captures and invokes tool handlers directly
 - Coverage by layer:
   - `test/cache.test.ts` — `KVCache` (no-op, hit, miss, invalid JSON, TTL)
@@ -165,6 +177,7 @@ User (Claude Desktop / claude.ai)
 - `update_opportunity` validates at least one update field is provided; replaces associations wholesale
 - Cache: opportunity profiles at 5 min TTL; `update` writes back to cache on success
 - Wired into `server.ts`; 21 new tests (10 API, 11 tool) → 187 total passing
+
 ---
 
 ### Phase 10 — Write: People & Organizations
@@ -360,23 +373,35 @@ Basic error handling belongs in Phase 1 — the API client should handle these c
 ```
 AffinityConnector/
 ├── src/
-│   ├── index.ts          # Worker entry point (fetch handler + MCP server)
-│   ├── server.ts         # Tool/resource registration
+│   ├── index.ts              # Worker entry point (fetch handler + MCP server)
+│   ├── server.ts             # API class instantiation + tool registration
+│   ├── cache.ts              # KVCache wrapper with per-category TTLs
 │   ├── affinity/
-│   │   ├── client.ts     # Affinity API client (fetch-based, apiRequest helper)
-│   │   ├── people.ts     # People endpoints (v2)
-│   │   ├── organizations.ts  # Org endpoints (v2)
-│   │   ├── lists.ts      # List endpoints (v1)
-│   │   ├── notes.ts      # Notes endpoints (v1)
-│   │   └── types.ts      # TypeScript types for API responses
+│   │   ├── client.ts         # fetch-based client; Bearer auth; error classes; retry
+│   │   ├── people.ts         # People endpoints (v2)
+│   │   ├── organizations.ts  # Organization endpoints (v2)
+│   │   ├── lists.ts          # List, list-entry, and field-value endpoints (v1)
+│   │   ├── notes.ts          # Notes and interactions endpoints (v1)
+│   │   ├── intelligence.ts   # Relationship strength endpoints (v1)
+│   │   ├── fields.ts         # Field definition and audit endpoints (v1)
+│   │   ├── opportunities.ts  # Opportunity CRUD endpoints (v1)
+│   │   └── types.ts          # TypeScript types for all API responses
 │   └── tools/
-│       ├── people.ts     # MCP tool handlers
-│       ├── organizations.ts
-│       ├── lists.ts
-│       └── notes.ts
-├── .dev.vars             # Local dev secrets (gitignored)
-├── .env.example          # Documents required secrets
-├── wrangler.toml         # Workers config (deploy target, vars, bindings)
+│       ├── people.ts         # search_people, get_person
+│       ├── organizations.ts  # search_organizations, get_organization
+│       ├── lists.ts          # get_lists, get_list_entries, get/set/delete_field_value
+│       ├── notes.ts          # get_notes, create_note, get_interactions
+│       ├── intelligence.ts   # get_relationship_strength, find_intro_path, summarize_relationship
+│       ├── fields.ts         # get_field_definitions, get_field_value_changes
+│       └── opportunities.ts  # search/get/create/update_opportunity
+├── test/
+│   ├── helpers/
+│   │   ├── kv-mock.ts        # In-memory KVNamespace mock
+│   │   └── mock-server.ts    # McpServer mock for tool handler testing
+│   ├── affinity/             # API class unit tests
+│   └── tools/                # MCP tool unit tests
+├── .dev.vars                 # Local dev secrets (gitignored)
+├── wrangler.toml             # Workers config (deploy target, KV binding, vars)
 ├── package.json
 ├── tsconfig.json
 └── README.md
