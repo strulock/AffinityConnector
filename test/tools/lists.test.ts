@@ -160,6 +160,7 @@ const BASE_MOCK_API = () => ({
   getFieldValues: vi.fn(),
   setFieldValue: vi.fn(),
   deleteFieldValue: vi.fn(),
+  batchSetFieldValues: vi.fn(),
   addListEntry: vi.fn(),
   removeListEntry: vi.fn(),
   getSavedViews: vi.fn(),
@@ -294,5 +295,38 @@ describe('get_saved_view_entries tool', () => {
     registerListTools(server, mockApi);
     const result = await callTool('get_saved_view_entries', { list_id: 1, view_id: 10, limit: 25 });
     expect(result.content[0].text).toContain('No entries found');
+  });
+});
+
+describe('batch_set_field_values tool', () => {
+  it('returns success message with updated field count', async () => {
+    const updatedFields = [
+      { id: 301, field_id: 5, entity_type: 1, entity_id: 10, list_entry_id: 101, value: 'Series B' },
+      { id: 302, field_id: 6, entity_type: 1, entity_id: 10, list_entry_id: 101, value: '2024-01-01' },
+    ];
+    const mockApi = { ...BASE_MOCK_API(), batchSetFieldValues: vi.fn().mockResolvedValue(updatedFields) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('batch_set_field_values', {
+      list_id: 1,
+      list_entry_id: 101,
+      fields: [{ field_id: 5, value: 'Series B' }, { field_id: 6, value: '2024-01-01' }],
+    });
+    const text = result.content[0].text;
+    expect(text).toContain('2 field value');
+    expect(text).toContain('101');
+    expect(text).toContain('list 1');
+  });
+
+  it('passes correct args to batchSetFieldValues', async () => {
+    const mockApi = { ...BASE_MOCK_API(), batchSetFieldValues: vi.fn().mockResolvedValue([]) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    await callTool('batch_set_field_values', {
+      list_id: 2,
+      list_entry_id: 200,
+      fields: [{ field_id: 7, value: 42 }],
+    });
+    expect(mockApi.batchSetFieldValues).toHaveBeenCalledWith(2, 200, [{ field_id: 7, value: 42 }]);
   });
 });

@@ -234,6 +234,32 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
   );
 
   server.tool(
+    'batch_set_field_values',
+    'Update multiple custom field values on a single list entry in one request (v2). Accepts up to 100 field/value pairs. Use get_field_definitions to find field IDs. Requires "Export data from Lists" permission.',
+    {
+      list_id: z.number().int().describe('List ID containing the entry (from get_lists)'),
+      list_entry_id: z.number().int().describe('List entry ID to update (from get_list_entries)'),
+      fields: z
+        .array(z.object({
+          field_id: z.number().int().describe('Field ID (from get_field_definitions)'),
+          value: z.union([z.string(), z.number(), z.boolean(), z.null()]).describe('New field value'),
+        }))
+        .min(1)
+        .max(100)
+        .describe('Array of field_id + value pairs to update'),
+    },
+    async ({ list_id, list_entry_id, fields }) => {
+      const updated = await api.batchSetFieldValues(list_id, list_entry_id, fields);
+      return {
+        content: [{
+          type: 'text',
+          text: `Updated ${updated.length} field value(s) on list entry ${list_entry_id} in list ${list_id}.`,
+        }],
+      };
+    }
+  );
+
+  server.tool(
     'get_saved_view_entries',
     'Fetch list entries through a saved view, respecting its filters and sort order. Use get_saved_views to find view IDs.',
     {

@@ -213,3 +213,65 @@ export interface AffinityFieldValueChange {
   changed_by_id: number;
   changed_at: string;
 }
+
+// Semantic search (v2 BETA) — companies/orgs only
+export interface AffinitySemanticResult {
+  id: number;
+  name: string;
+  domain: string | null;
+  domains: string[];
+  person_ids: number[];
+  created_at: string;
+}
+
+// Transcripts (v2 BETA)
+export interface AffinityTranscript {
+  id: string;
+  title: string | null;
+  call_id: string | null;
+  meeting_id: string | null;
+  created_at: string;
+  person_ids: number[];
+  organization_ids: number[];
+}
+
+export interface AffinityTranscriptFragment {
+  id: string;
+  transcript_id: string;
+  speaker_label: string | null;
+  content: string;
+  start_ms: number;
+  end_ms: number;
+}
+
+// Merges (v2 deduplication)
+export interface AffinityMergeTask {
+  id: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  merges: AffinityMerge[];
+  created_at: string;
+}
+
+export interface AffinityMerge {
+  id: string;
+  task_id: string;
+  base_entity_id: number;
+  to_merge_entity_id: number;
+  status: 'pending' | 'completed' | 'failed';
+}
+
+// Utility
+export interface AffinityCurrentUser {
+  id: number;
+  first_name: string;
+  last_name: string;
+  email: string;
+  organization_id: number;
+  organization_name: string | null;
+}
+
+export interface AffinityRateLimit {
+  limit: number;
+  remaining: number;
+  reset_in: number;
+}

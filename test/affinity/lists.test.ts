@@ -294,3 +294,34 @@ describe('ListsApi.getSavedViewEntries', () => {
     expect(result.nextPageToken).toBe('tok-xyz');
   });
 });
+
+describe('ListsApi.batchSetFieldValues', () => {
+  it('POSTs to /v2/lists/{id}/list-entries/{entryId}/fields and returns data array', async () => {
+    const updatedFields = [
+      { id: 301, field_id: 5, entity_type: 1, entity_id: 10, list_entry_id: 101, value: 'Series B' },
+    ];
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ data: updatedFields }), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new ListsApi(new AffinityClient('key'));
+    const result = await api.batchSetFieldValues(1, 101, [{ field_id: 5, value: 'Series B' }]);
+    expect(result).toEqual(updatedFields);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/v2/');
+    expect(url).toContain('/lists/1/list-entries/101/fields');
+    expect((init as RequestInit).method).toBe('POST');
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.operation).toBe('update-fields');
+    expect(body.fields).toEqual([{ field_id: 5, value: 'Series B' }]);
+  });
+
+  it('returns empty array when data is missing', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
+    ));
+    const api = new ListsApi(new AffinityClient('key'));
+    const result = await api.batchSetFieldValues(1, 101, [{ field_id: 5, value: 'test' }]);
+    expect(result).toEqual([]);
+  });
+});

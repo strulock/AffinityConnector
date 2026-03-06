@@ -91,6 +91,24 @@ export class ListsApi {
     });
   }
 
+  /**
+   * Batch update up to 100 fields on a single list entry (v2).
+   * POST /v2/lists/{listId}/list-entries/{listEntryId}/fields with operation: update-fields
+   * Requires "Export data from Lists" permission.
+   */
+  async batchSetFieldValues(
+    listId: number,
+    listEntryId: number,
+    fields: Array<{ field_id: number; value: unknown }>,
+  ): Promise<AffinityFieldValue[]> {
+    const result = await this.client.post<{ data: AffinityFieldValue[] }>(
+      `/lists/${listId}/list-entries/${listEntryId}/fields`,
+      { operation: 'update-fields', fields },
+      'v2',
+    );
+    return result.data ?? [];
+  }
+
   /** Remove a list entry (v1 DELETE /lists/{id}/list-entries/{entry_id}). */
   async removeListEntry(listId: number, listEntryId: number): Promise<void> {
     await this.client.del<{ success: boolean }>(`/lists/${listId}/list-entries/${listEntryId}`);

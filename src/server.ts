@@ -21,6 +21,14 @@ import { RemindersApi } from "./affinity/reminders.js";
 import { registerReminderTools } from "./tools/reminders.js";
 import { InteractionsV2Api } from "./affinity/interactions_v2.js";
 import { registerInteractionsV2Tools } from "./tools/interactions_v2.js";
+import { SemanticSearchApi } from "./affinity/semantic_search.js";
+import { registerSemanticSearchTools } from "./tools/semantic_search.js";
+import { TranscriptsApi } from "./affinity/transcripts.js";
+import { registerTranscriptTools } from "./tools/transcripts.js";
+import { MergesApi } from "./affinity/merges.js";
+import { registerMergeTools } from "./tools/merges.js";
+import { UtilityApi } from "./affinity/utility.js";
+import { registerUtilityTools } from "./tools/utility.js";
 
 export function createServer(apiKey: string, options?: AffinityClientOptions): McpServer {
   const client = new AffinityClient(apiKey, options);
@@ -33,6 +41,10 @@ export function createServer(apiKey: string, options?: AffinityClientOptions): M
   const opportunitiesApi = new OpportunitiesApi(client);
   const remindersApi = new RemindersApi(client);
   const interactionsV2Api = new InteractionsV2Api(client);
+  const semanticSearchApi = new SemanticSearchApi(client);
+  const transcriptsApi = new TranscriptsApi(client);
+  const mergesApi = new MergesApi(client);
+  const utilityApi = new UtilityApi(client);
 
   const server = new McpServer({
     name: "affinity-connector",
@@ -49,6 +61,10 @@ export function createServer(apiKey: string, options?: AffinityClientOptions): M
   registerOpportunityTools(server, opportunitiesApi);
   registerReminderTools(server, remindersApi);
   registerInteractionsV2Tools(server, interactionsV2Api);
+  registerSemanticSearchTools(server, semanticSearchApi);
+  registerTranscriptTools(server, transcriptsApi);
+  registerMergeTools(server, mergesApi);
+  registerUtilityTools(server, utilityApi);
 
   return server;
 }

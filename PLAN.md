@@ -56,8 +56,12 @@ User (Claude Desktop / claude.ai)
 ### People & Organizations
 - `search_people` — search contacts by name, email, domain ✔
 - `get_person` — full profile + interaction history ✔
+- `create_person` — create a new contact ✔
+- `update_person` — update name, emails, or org associations ✔
 - `search_organizations` — search companies ✔
 - `get_organization` — full org profile + associated people ✔
+- `create_organization` — create a new company ✔
+- `update_organization` — update name or domain ✔
 
 ### Lists & Field Values
 - `get_lists` — list all Affinity lists ✔
@@ -65,6 +69,10 @@ User (Claude Desktop / claude.ai)
 - `get_field_values` — custom field values for a list entry ✔
 - `set_field_value` — create or update a field value on a list entry ✔
 - `delete_field_value` — delete a field value by ID ✔
+- `add_to_list` — add a person, org, or opportunity to a list ✔
+- `remove_from_list` — remove a list entry by entry ID ✔
+- `get_saved_views` — list saved views for a list ✔
+- `get_saved_view_entries` — fetch entries through a saved view ✔
 
 ### Field Definitions
 - `get_field_definitions` — list field schemas (name, type, constraints) ✔
@@ -79,12 +87,39 @@ User (Claude Desktop / claude.ai)
 ### Notes & Activity
 - `get_notes` — notes on a person or org ✔
 - `create_note` — add a note to a record ✔
-- `get_interactions` — email/meeting history ✔
+- `get_note_replies` — fetch reply thread for a note (v2) ✔
+- `update_note` — update note content by ID ✔
+- `delete_note` — delete a note by ID ✔
+- `get_interactions` — email/meeting history (v1) ✔
+- `get_emails` — email history with date-range filtering (v2) ✔
+- `get_calls` — call history, v2-only ✔
+- `get_meetings` — meeting history with richer metadata (v2) ✔
+- `get_chat_messages` — Slack/chat message history, v2-only ✔
+
+### Reminders
+- `get_reminders` — list follow-up reminders, filterable by person/org/opportunity ✔
+- `create_reminder` — create a follow-up with content, due date, and associations ✔
+- `update_reminder` — reschedule, edit content, or mark completed ✔
+- `delete_reminder` — delete a reminder by ID ✔
 
 ### Intelligence
 - `find_intro_path` — who can intro me to a target person/org ✔
 - `get_relationship_strength` — relationship score data ✔
 - `summarize_relationship` — AI-generated relationship summary ✔
+
+### Transcripts & Semantic Search (BETA)
+- `semantic_search` — AI-powered natural-language company search (v2 BETA, companies only) ✔
+- `get_transcripts` — list call/meeting transcripts, filterable by person/org ✔
+- `get_transcript` — read full transcript content with timestamped speaker fragments ✔
+
+### Deduplication
+- `merge_persons` — merge two person records; polls until complete (DESTRUCTIVE) ✔
+- `merge_companies` — merge two company records; polls until complete (DESTRUCTIVE) ✔
+
+### Utility
+- `get_whoami` — current authenticated user identity and org ✔
+- `get_rate_limit` — remaining API quota and reset time ✔
+- `batch_set_field_values` — update 1–100 fields on a list entry in one v2 request ✔
 
 ---
 
@@ -135,7 +170,7 @@ User (Claude Desktop / claude.ai)
 - `README.md`: full tool reference, claude.ai + Claude Desktop connection instructions, deployment guide
 
 ### Phase 6 — Test Suite ✔ COMPLETE
-- Framework: **Vitest** with `@vitest/coverage-v8`; 126 tests across 14 test files (187 tests as of Phase 9)
+- Framework: **Vitest** with `@vitest/coverage-v8`; 126 tests across 14 test files (308 tests as of Phase 14)
 - `test/helpers/kv-mock.ts`: in-memory `KVNamespace` mock; `test/helpers/mock-server.ts`: `McpServer` mock that captures and invokes tool handlers directly
 - Coverage by layer:
   - `test/cache.test.ts` — `KVCache` (no-op, hit, miss, invalid JSON, TTL)
@@ -154,7 +189,7 @@ User (Claude Desktop / claude.ai)
 - New types in `types.ts`: `AffinityField`, `AffinityFieldValueChange`
 - Cache: field definitions at 10 min TTL (`fields: 600`); field value changes not cached (live audit data)
 - `get_field_definitions` exposes field ID, name, value type (Text/Number/Date/Location/Person/Organization/Dropdown), scope (global vs list), and constraint flags (required, multi-value, read-only)
-- Wired into `server.ts`; 17 new tests → 157 total passing
+- Wired into `server.ts`; 17 new tests added in this phase
 
 ---
 
@@ -164,7 +199,7 @@ User (Claude Desktop / claude.ai)
 - Extends `src/tools/lists.ts`: `set_field_value` (create or update; validates required params for create path), `delete_field_value`
 - `set_field_value` accepts `field_id`, `value`, optional `field_value_id` (update path), optional `list_entry_id`/`entity_id`/`entity_type` (create path)
 - Value type accepts string, number, boolean, or null (covers text, numeric, date, dropdown)
-- 9 new tests (5 API, 4 tool) → 166 total passing
+- 9 new tests (5 API, 4 tool) added in this phase
 
 ---
 
@@ -176,101 +211,83 @@ User (Claude Desktop / claude.ai)
 - `create_opportunity` accepts `name`, optional `person_ids`/`organization_ids`; use `add_to_list` (Phase 11) to add to a pipeline
 - `update_opportunity` validates at least one update field is provided; replaces associations wholesale
 - Cache: opportunity profiles at 5 min TTL; `update` writes back to cache on success
-- Wired into `server.ts`; 21 new tests (10 API, 11 tool) → 187 total passing
+- Wired into `server.ts`; 21 new tests (10 API, 11 tool) added in this phase
 
 ---
 
-### Phase 10 — Write: People & Organizations
-
-Create and update the core CRM entities. Most useful for "add this person I just met" and "update the company domain" workflows.
-
-**Extends `src/affinity/people.ts`:** add `create`, `update`, `delete` (v1 `POST/PUT/DELETE /persons`)
-**Extends `src/affinity/organizations.ts`:** add `create`, `update`, `delete` (v1 `POST/PUT/DELETE /organizations`)
-
-**New MCP tools (extend `src/tools/people.ts` and `src/tools/organizations.ts`):**
-- `create_person` — create a new contact; accepts `first_name`, `last_name`, `emails`, optional `organization_ids`, `phone_numbers`
-- `update_person` — update name, emails, or org associations on an existing person by ID
-- `create_organization` — create a new company; accepts `name`, `domain`, optional `person_ids`
-- `update_organization` — update name or domain on an existing org by ID
-
-**Design note:** skip `delete_person` / `delete_organization` MCP tools for now — destructive, hard to reverse, low AI-assistant use case. Can be added later if needed.
-
-**Cache invalidation:** bust `people:{id}` and `orgs:{id}` cache keys on successful write.
+### Phase 10 — Write: People & Organizations ✔ COMPLETE
+- Extends `src/affinity/people.ts`: added `create` (v1 `POST /persons`), `update` (v1 `PUT /persons/{id}`)
+- Extends `src/affinity/organizations.ts`: added `create` (v1 `POST /organizations`), `update` (v1 `PUT /organizations/{id}`)
+- New MCP tools in `src/tools/people.ts`: `create_person` (requires `first_name`/`last_name`; optional `emails`, `organization_ids`, `phone_numbers`), `update_person` (validates at least one field provided)
+- New MCP tools in `src/tools/organizations.ts`: `create_organization` (requires `name`; optional `domain`, `person_ids`), `update_organization` (validates at least one field provided)
+- `update` writes back to cache (`people:{id}`, `orgs:{id}`) on success so subsequent `getById` is served from cache
+- `delete_person` / `delete_organization` intentionally omitted — destructive, hard to reverse, low AI-assistant use case
+- 16 new tests (6 API, 10 tool) → 203 total passing
 
 ---
 
-### Phase 11 — List Management & Saved Views
-
-Add entries to lists (add a deal to the pipeline), remove them, and query lists through their saved views.
-
-**Extends `src/affinity/lists.ts`:** add `addListEntry` (v1 `POST /lists/{id}/list-entries`), `removeListEntry` (v1 `DELETE /lists/{id}/list-entries/{entry_id}`), `getSavedViews` (v2 `GET /v2/lists/{id}/saved-views`), `getSavedViewEntries` (v2 `GET /v2/lists/{id}/saved-views/{viewId}/list-entries`)
-
-**New MCP tools (extend `src/tools/lists.ts`):**
-- `add_to_list` — add a person, org, or opportunity to a list by entity ID + entity type
-- `remove_from_list` — remove a list entry by `list_entry_id`
-- `get_saved_views` — list the saved views defined for a given list (view name, ID, creator)
-- `get_saved_view_entries` — fetch list entries through a named saved view (respects that view's filters, sort order, and visible columns); accepts `list_id` + `view_id` or `view_name`
-
-**New types:** `AffinitySavedView`
+### Phase 11 — List Management & Saved Views ✔ COMPLETE
+- Extends `src/affinity/lists.ts`: `addListEntry` (v1 `POST /lists/{id}/list-entries`), `removeListEntry` (v1 `DELETE /lists/{id}/list-entries/{entry_id}`), `getSavedViews` (v2 `GET /v2/lists/{id}/saved-views`, cached at list TTL), `getSavedViewEntries` (v2 `GET /v2/lists/{id}/saved-views/{viewId}/list-entries`)
+- New MCP tools in `src/tools/lists.ts`: `add_to_list`, `remove_from_list`, `get_saved_views`, `get_saved_view_entries`
+- `get_saved_view_entries` respects view filters/sort and supports pagination via `page_token`
+- New type: `AffinitySavedView` (`id`, `list_id`, `name`, `creator_id`, `is_public`)
+- Refactored test mockApi objects into shared `BASE_MOCK_API` factory for maintainability
+- 15 new tests (7 API, 8 tool) → 218 total passing
 
 ---
 
-### Phase 12 — Reminders
-
-Surface Affinity's task/reminder system so Claude can schedule follow-ups directly from conversation.
-
-**New API class:**
-- `src/affinity/reminders.ts`: `RemindersApi` with `getReminders`, `createReminder`, `updateReminder`, `deleteReminder` (all v1)
-
-**New MCP tools (`src/tools/reminders.ts`):**
-- `get_reminders` — list upcoming reminders; accepts optional `person_id` or `organization_id` filter
-- `create_reminder` — create a follow-up reminder; accepts `content`, `due_date`, and at least one of `person_id`/`organization_id`/`opportunity_id`
-- `update_reminder` — reschedule or update reminder content
-- `delete_reminder` — delete a reminder by ID (after it's been acted on)
-
-**New types:** `AffinityReminder`
+### Phase 12 — Reminders ✔ COMPLETE
+- New `src/affinity/reminders.ts`: `RemindersApi` with `getReminders` (v1, cached 2 min, separate cache key per filter combo), `createReminder`, `updateReminder`, `deleteReminder` (all v1)
+- New `src/tools/reminders.ts`: `get_reminders`, `create_reminder`, `update_reminder`, `delete_reminder`
+- `create_reminder` validates at least one of `person_ids`/`organization_ids`/`opportunity_ids` is non-empty; defaults missing arrays to `[]`
+- `update_reminder` validates at least one field is provided; supports marking `completed: true`
+- Format: `[reminder:{id}] due/completed {date} — {content} [people: …; orgs: …]`
+- New type: `AffinityReminder` (`id`, `content`, `due_date`, `person_ids`, `organization_ids`, `opportunity_ids`, `creator_id`, `completed_at`, `created_at`)
+- Added `CACHE_TTL.reminders: 120` to `cache.ts`
+- Wired into `server.ts`; 19 new tests (9 API, 10 tool) → 237 total passing
 
 ---
 
-### Phase 13 — v2 Rich Interactions & Note Threads
-
-Replace / supplement the v1 `/interactions` catch-all with v2's granular per-type endpoints, and add note reply thread support.
-
-**New API class:**
-- `src/affinity/interactions_v2.ts`: `InteractionsV2Api` with `getEmails`, `getCalls`, `getMeetings`, `getChatMessages` (all v2); each supports filtering by `id`, timestamp range (`sentAt`/`startTime`/`createdAt`), and pagination
-
-**Extends `src/affinity/notes.ts`:** add `getNoteReplies` (v2 `GET /v2/notes/{id}/replies`), `updateNote` (v1 `PUT /notes/{id}`), `deleteNote` (v1 `DELETE /notes/{id}`)
-
-**New MCP tools (`src/tools/interactions_v2.ts`):**
-- `get_emails` — email history with date-range filtering
-- `get_calls` — call history (v2-only; no v1 equivalent)
-- `get_meetings` — meeting history with richer metadata than v1
-- `get_chat_messages` — Slack/chat message history (v2-only)
-
-**Extend `src/tools/notes.ts`:**
-- `get_note_replies` — fetch reply thread for a note by `note_id`
-- `update_note` — update note content by ID
-- `delete_note` — delete a note by ID
+### Phase 13 — v2 Rich Interactions & Note Threads ✔ COMPLETE
+- New `src/affinity/interactions_v2.ts`: `InteractionsV2Api` with `getEmails`, `getCalls`, `getMeetings`, `getChatMessages` (all v2, no caching — live activity feeds)
+- Per-type timestamp filter fields: emails/chats use `sent_at`, calls/meetings use `start_time`; all support `created_after`/`created_before`, pagination
+- New `src/tools/interactions_v2.ts`: `get_emails`, `get_calls`, `get_meetings`, `get_chat_messages`; shared `COMMON_PARAMS` schema; `get_calls` and `get_chat_messages` noted as v2-only
+- Extends `src/affinity/notes.ts`: `getNoteReplies` (v2 `GET /v2/notes/{id}/replies` — v2 main notes list excludes replies by design), `updateNote` (v1 `PUT /notes/{id}`), `deleteNote` (v1 `DELETE /notes/{id}`)
+- Extends `src/tools/notes.ts`: `get_note_replies`, `update_note`, `delete_note`
+- New types: `AffinityEmailV2`, `AffinityCallV2`, `AffinityMeetingV2`, `AffinityChatMessageV2`, `AffinityNoteReply`
+- Wired into `server.ts`; 33 new tests (16 API, 17 tool) → 270 total passing
 
 ---
 
-### Phase 14 — Advanced Features & Beta
+### Phase 14 — Advanced Features & Beta ✔ COMPLETE
 
 **Semantic Search (v2 BETA):**
-- `src/affinity/semantic_search.ts`: `SemanticSearchApi` with `search` (v2 `POST /v2/semantic-search`)
-- MCP tool `semantic_search` — natural-language company search; accepts a free-text `query`, returns ranked company matches; clearly label as beta in tool description
+- New `src/affinity/semantic_search.ts`: `SemanticSearchApi` with `search` (v2 `POST /v2/search`, entity_types: ['company'])
+- New `src/tools/semantic_search.ts`: `semantic_search` tool — AI-powered natural-language search; **currently supports companies only**; labeled as BETA in tool description
 
 **Transcripts (v2 BETA):**
-- `src/affinity/transcripts.ts`: `TranscriptsApi` with `getTranscripts`, `getTranscript`, `getTranscriptFragments` (v2)
-- MCP tools `get_transcripts`, `get_transcript` — list and read call/meeting transcripts with fragment-level access
+- New `src/affinity/transcripts.ts`: `TranscriptsApi` with `getTranscripts`, `getTranscript`, `getTranscriptFragments` (all v2)
+- New `src/tools/transcripts.ts`: `get_transcripts`, `get_transcript` — list and read call/meeting transcripts with timestamped speaker fragments
 
 **Deduplication (v2):**
-- Extend `src/affinity/people.ts` / `organizations.ts`: `mergePeople` (v2 `POST /v2/person-merges`), `mergeCompanies` (v2 `POST /v2/company-merges`)
-- MCP tools `merge_persons`, `merge_companies` — requires confirmation guard in the tool description; polls the async merge task status before returning
+- New `src/affinity/merges.ts`: `MergesApi` with `mergePersons` (POST /v2/person-merges), `mergeCompanies` (POST /v2/company-merges), `getMergeTaskStatus` (GET /v2/person-merge-tasks/{id} or /v2/company-merge-tasks/{id})
+- New `src/tools/merges.ts`: `merge_persons`, `merge_companies` — DESTRUCTIVE warning in description; tools poll until task is completed/failed (up to 5 attempts × 1s) before returning
+- Requires "Manage duplicates" permission + organization admin role
 
 **Utility:**
-- `get_whoami` — identify the authenticated user (v1 `GET /whoami` or v2 `GET /v2/auth/whoami`); useful for "who is the current API user?" and onboarding
-- `get_rate_limit` — return remaining monthly and per-minute quota (v1 `GET /rate-limit`)
+- New `src/affinity/utility.ts`: `UtilityApi` with `getCurrentUser` (v2 GET /auth/current-user) and `getRateLimit` (v1 GET /rate-limit)
+- New `src/tools/utility.ts`: `get_whoami` (user identity + org), `get_rate_limit` (remaining quota + reset time)
+
+**Batch Field Updates (v2):**
+- Extends `src/affinity/lists.ts`: `batchSetFieldValues` (POST /v2/lists/{listId}/list-entries/{listEntryId}/fields with operation: update-fields)
+- Extends `src/tools/lists.ts`: `batch_set_field_values` tool — update 1–100 field values on a single list entry in one request
+
+- Wired into `server.ts`; 38 new tests (19 API, 19 tool) → 308 total passing
+
+**Webhooks (v1, not yet planned):**
+- v1 has full webhook subscription CRUD (`GET/POST/PUT/DELETE /webhook-subscriptions`)
+- Could enable event-driven workflows (e.g. notify Claude when a list entry changes)
+- Not planned for current phases; add as Phase 15 if needed
 
 ---
 
@@ -385,15 +402,27 @@ AffinityConnector/
 │   │   ├── intelligence.ts   # Relationship strength endpoints (v1)
 │   │   ├── fields.ts         # Field definition and audit endpoints (v1)
 │   │   ├── opportunities.ts  # Opportunity CRUD endpoints (v1)
+│   │   ├── reminders.ts      # Reminder CRUD endpoints (v1)
+│   │   ├── interactions_v2.ts # v2 emails, calls, meetings, chat messages
+│   │   ├── semantic_search.ts # v2 BETA AI-powered company search
+│   │   ├── transcripts.ts    # v2 BETA call/meeting transcripts + fragments
+│   │   ├── merges.ts         # v2 async deduplication (person + company merges)
+│   │   ├── utility.ts        # v2 current user + v1 rate limit
 │   │   └── types.ts          # TypeScript types for all API responses
 │   └── tools/
-│       ├── people.ts         # search_people, get_person
-│       ├── organizations.ts  # search_organizations, get_organization
-│       ├── lists.ts          # get_lists, get_list_entries, get/set/delete_field_value
-│       ├── notes.ts          # get_notes, create_note, get_interactions
+│       ├── people.ts         # search_people, get_person, create_person, update_person
+│       ├── organizations.ts  # search_organizations, get_organization, create_organization, update_organization
+│       ├── lists.ts          # get_lists, get_list_entries, get/set/delete/batch_set_field_value(s), add/remove_from_list, get_saved_views/entries
+│       ├── notes.ts          # get_notes, create_note, get_interactions, get_note_replies, update_note, delete_note
 │       ├── intelligence.ts   # get_relationship_strength, find_intro_path, summarize_relationship
 │       ├── fields.ts         # get_field_definitions, get_field_value_changes
-│       └── opportunities.ts  # search/get/create/update_opportunity
+│       ├── opportunities.ts  # search/get/create/update_opportunity
+│       ├── reminders.ts      # get/create/update/delete_reminder
+│       ├── interactions_v2.ts # get_emails, get_calls, get_meetings, get_chat_messages
+│       ├── semantic_search.ts # semantic_search (BETA)
+│       ├── transcripts.ts    # get_transcripts, get_transcript (BETA)
+│       ├── merges.ts         # merge_persons, merge_companies
+│       └── utility.ts        # get_whoami, get_rate_limit
 ├── test/
 │   ├── helpers/
 │   │   ├── kv-mock.ts        # In-memory KVNamespace mock
