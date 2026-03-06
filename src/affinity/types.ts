@@ -106,3 +106,26 @@ export interface AffinityFieldValue {
   list_entry_id: number | null;
   value: unknown;
 }
+
+export interface AffinityNote {
+  id: number;
+  person_ids: number[];
+  organization_ids: number[];
+  opportunity_ids: number[];
+  creator_id: number;
+  content: string;
+  type: number;
+  is_deleted: boolean;
+  created_at: string;
+}
+
+export interface AffinityInteraction {
+  id: number;
+  type: number; // 0 = email, 1 = meeting
+  date: string;
+  subject: string | null;
+  body_text: string | null;
+  person_ids: number[];
+  organization_ids: number[];
+  creator_ids: number[];
+}
