@@ -19,6 +19,8 @@ import { OpportunitiesApi } from "./affinity/opportunities.js";
 import { registerOpportunityTools } from "./tools/opportunities.js";
 import { RemindersApi } from "./affinity/reminders.js";
 import { registerReminderTools } from "./tools/reminders.js";
+import { InteractionsV2Api } from "./affinity/interactions_v2.js";
+import { registerInteractionsV2Tools } from "./tools/interactions_v2.js";
 
 export function createServer(apiKey: string, options?: AffinityClientOptions): McpServer {
   const client = new AffinityClient(apiKey, options);
@@ -30,6 +32,7 @@ export function createServer(apiKey: string, options?: AffinityClientOptions): M
   const fieldsApi = new FieldsApi(client);
   const opportunitiesApi = new OpportunitiesApi(client);
   const remindersApi = new RemindersApi(client);
+  const interactionsV2Api = new InteractionsV2Api(client);
 
   const server = new McpServer({
     name: "affinity-connector",
@@ -45,6 +48,7 @@ export function createServer(apiKey: string, options?: AffinityClientOptions): M
   registerFieldTools(server, fieldsApi);
   registerOpportunityTools(server, opportunitiesApi);
   registerReminderTools(server, remindersApi);
+  registerInteractionsV2Tools(server, interactionsV2Api);
 
   return server;
 }

@@ -137,6 +137,52 @@ export interface AffinityRelationshipStrength {
   last_activity_date: string | null;
 }
 
+// v2 interaction types — granular per-channel endpoints replacing v1 /interactions
+
+export interface AffinityEmailV2 {
+  id: string;
+  subject: string | null;
+  sent_at: string;
+  created_at: string;
+  person_ids: number[];
+  organization_ids: number[];
+}
+
+export interface AffinityCallV2 {
+  id: string;
+  start_time: string;
+  created_at: string;
+  person_ids: number[];
+  organization_ids: number[];
+}
+
+export interface AffinityMeetingV2 {
+  id: string;
+  title: string | null;
+  start_time: string;
+  end_time: string | null;
+  created_at: string;
+  person_ids: number[];
+  organization_ids: number[];
+}
+
+export interface AffinityChatMessageV2 {
+  id: string;
+  content: string | null;
+  sent_at: string;
+  created_at: string;
+  person_ids: number[];
+  organization_ids: number[];
+}
+
+export interface AffinityNoteReply {
+  id: number;
+  note_id: number;
+  creator_id: number;
+  content: string;
+  created_at: string;
+}
+
 export interface AffinityReminder {
   id: number;
   content: string;

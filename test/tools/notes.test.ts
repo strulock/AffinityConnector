@@ -131,3 +131,73 @@ describe('get_interactions tool', () => {
     expect(result.content[0].text).toContain('More interactions available');
   });
 });
+
+const MOCK_REPLY = { id: 200, note_id: 1, creator_id: 99, content: 'Great meeting!', created_at: '2024-02-01T10:00:00Z' };
+
+describe('get_note_replies tool', () => {
+  it('returns formatted replies', async () => {
+    const mockApi = {
+      getNotes: vi.fn(), createNote: vi.fn(), getInteractions: vi.fn(),
+      getNoteReplies: vi.fn().mockResolvedValue({ replies: [MOCK_REPLY], nextPageToken: undefined }),
+      updateNote: vi.fn(), deleteNote: vi.fn(),
+    } as unknown as NotesApi;
+    const { callTool } = setupWithMockApi(mockApi);
+    const result = await callTool('get_note_replies', { note_id: 1, limit: 25 });
+    const text = result.content[0].text;
+    expect(text).toContain('[reply:200]');
+    expect(text).toContain('Great meeting!');
+    expect(text).toContain('user 99');
+    expect(text).toContain('1 reply');
+  });
+
+  it('shows pagination token when available', async () => {
+    const mockApi = {
+      getNotes: vi.fn(), createNote: vi.fn(), getInteractions: vi.fn(),
+      getNoteReplies: vi.fn().mockResolvedValue({ replies: [MOCK_REPLY], nextPageToken: 'tok-r' }),
+      updateNote: vi.fn(), deleteNote: vi.fn(),
+    } as unknown as NotesApi;
+    const { callTool } = setupWithMockApi(mockApi);
+    const result = await callTool('get_note_replies', { note_id: 1, limit: 25 });
+    expect(result.content[0].text).toContain('tok-r');
+  });
+
+  it('returns a message when no replies exist', async () => {
+    const mockApi = {
+      getNotes: vi.fn(), createNote: vi.fn(), getInteractions: vi.fn(),
+      getNoteReplies: vi.fn().mockResolvedValue({ replies: [], nextPageToken: undefined }),
+      updateNote: vi.fn(), deleteNote: vi.fn(),
+    } as unknown as NotesApi;
+    const { callTool } = setupWithMockApi(mockApi);
+    const result = await callTool('get_note_replies', { note_id: 1, limit: 25 });
+    expect(result.content[0].text).toContain('No replies found');
+  });
+});
+
+describe('update_note tool', () => {
+  it('returns success with the note ID', async () => {
+    const mockApi = {
+      getNotes: vi.fn(), createNote: vi.fn(), getInteractions: vi.fn(),
+      getNoteReplies: vi.fn(),
+      updateNote: vi.fn().mockResolvedValue({ ...MOCK_NOTE, content: 'Updated' }),
+      deleteNote: vi.fn(),
+    } as unknown as NotesApi;
+    const { callTool } = setupWithMockApi(mockApi);
+    const result = await callTool('update_note', { note_id: 1, content: 'Updated' });
+    expect(result.content[0].text).toContain('Updated note');
+    expect(result.content[0].text).toContain('[id:1]');
+  });
+});
+
+describe('delete_note tool', () => {
+  it('returns a success message after deletion', async () => {
+    const mockApi = {
+      getNotes: vi.fn(), createNote: vi.fn(), getInteractions: vi.fn(),
+      getNoteReplies: vi.fn(), updateNote: vi.fn(),
+      deleteNote: vi.fn().mockResolvedValue(undefined),
+    } as unknown as NotesApi;
+    const { callTool } = setupWithMockApi(mockApi);
+    const result = await callTool('delete_note', { note_id: 1 });
+    expect(result.content[0].text).toContain('1');
+    expect(result.content[0].text).toContain('deleted successfully');
+  });
+});

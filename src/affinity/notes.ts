@@ -2,7 +2,7 @@
 
 import { AffinityClient } from './client.js';
 import { CACHE_TTL } from '../cache.js';
-import type { AffinityNote, AffinityInteraction } from './types.js';
+import type { AffinityNote, AffinityInteraction, AffinityNoteReply, AffinityPaginatedResponse } from './types.js';
 
 export class NotesApi {
   constructor(private client: AffinityClient) {}
@@ -76,5 +76,38 @@ export class NotesApi {
     const response = { interactions: Array.isArray(result) ? result : [] };
     await this.client.cache.set(cacheKey, response, CACHE_TTL.interactions);
     return response;
+  }
+
+  /**
+   * Fetch reply thread for a note (v2 GET /v2/notes/{id}/replies).
+   * Note: the v2 main notes list excludes replies; they are fetched separately via this endpoint.
+   */
+  async getNoteReplies(
+    noteId: number,
+    params: { limit?: number; page_token?: string } = {},
+  ): Promise<{ replies: AffinityNoteReply[]; nextPageToken?: string }> {
+    const { limit = 25, page_token } = params;
+    const queryParams: Record<string, unknown> = { page_size: limit };
+    if (page_token) queryParams.page_token = page_token;
+
+    const result = await this.client.get<AffinityPaginatedResponse<AffinityNoteReply>>(
+      `/notes/${noteId}/replies`,
+      queryParams,
+      'v2',
+    );
+    return {
+      replies: result.data ?? [],
+      nextPageToken: result.next_page_token ?? undefined,
+    };
+  }
+
+  /** Update the content of an existing note (v1 PUT /notes/{id}). */
+  async updateNote(noteId: number, content: string): Promise<AffinityNote> {
+    return this.client.put<AffinityNote>(`/notes/${noteId}`, { content });
+  }
+
+  /** Delete a note by ID (v1 DELETE /notes/{id}). */
+  async deleteNote(noteId: number): Promise<void> {
+    await this.client.del<{ success: boolean }>(`/notes/${noteId}`);
   }
 }
