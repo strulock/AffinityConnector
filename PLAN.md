@@ -153,3 +153,231 @@ User (Claude Desktop / claude.ai)
 - `set_field_value` accepts `field_id`, `value`, optional `field_value_id` (update path), optional `list_entry_id`/`entity_id`/`entity_type` (create path)
 - Value type accepts string, number, boolean, or null (covers text, numeric, date, dropdown)
 - 9 new tests (5 API, 4 tool) → 166 total passing
+
+---
+
+### Phase 9 — Opportunities ✔ COMPLETE
+- `src/affinity/opportunities.ts`: `OpportunitiesApi` with `search`, `getById`, `create`, `update` (all v1)
+- `src/tools/opportunities.ts`: `search_opportunities`, `get_opportunity`, `create_opportunity`, `update_opportunity` tools
+- `search_opportunities` accepts optional `term` and `list_id` to scope results
+- `get_opportunity` shows name, ID, person IDs, org IDs, list memberships, created date
+- `create_opportunity` accepts `name`, optional `person_ids`/`organization_ids`; use `add_to_list` (Phase 11) to add to a pipeline
+- `update_opportunity` validates at least one update field is provided; replaces associations wholesale
+- Cache: opportunity profiles at 5 min TTL; `update` writes back to cache on success
+- Wired into `server.ts`; 21 new tests (10 API, 11 tool) → 187 total passing
+---
+
+### Phase 10 — Write: People & Organizations
+
+Create and update the core CRM entities. Most useful for "add this person I just met" and "update the company domain" workflows.
+
+**Extends `src/affinity/people.ts`:** add `create`, `update`, `delete` (v1 `POST/PUT/DELETE /persons`)
+**Extends `src/affinity/organizations.ts`:** add `create`, `update`, `delete` (v1 `POST/PUT/DELETE /organizations`)
+
+**New MCP tools (extend `src/tools/people.ts` and `src/tools/organizations.ts`):**
+- `create_person` — create a new contact; accepts `first_name`, `last_name`, `emails`, optional `organization_ids`, `phone_numbers`
+- `update_person` — update name, emails, or org associations on an existing person by ID
+- `create_organization` — create a new company; accepts `name`, `domain`, optional `person_ids`
+- `update_organization` — update name or domain on an existing org by ID
+
+**Design note:** skip `delete_person` / `delete_organization` MCP tools for now — destructive, hard to reverse, low AI-assistant use case. Can be added later if needed.
+
+**Cache invalidation:** bust `people:{id}` and `orgs:{id}` cache keys on successful write.
+
+---
+
+### Phase 11 — List Management & Saved Views
+
+Add entries to lists (add a deal to the pipeline), remove them, and query lists through their saved views.
+
+**Extends `src/affinity/lists.ts`:** add `addListEntry` (v1 `POST /lists/{id}/list-entries`), `removeListEntry` (v1 `DELETE /lists/{id}/list-entries/{entry_id}`), `getSavedViews` (v2 `GET /v2/lists/{id}/saved-views`), `getSavedViewEntries` (v2 `GET /v2/lists/{id}/saved-views/{viewId}/list-entries`)
+
+**New MCP tools (extend `src/tools/lists.ts`):**
+- `add_to_list` — add a person, org, or opportunity to a list by entity ID + entity type
+- `remove_from_list` — remove a list entry by `list_entry_id`
+- `get_saved_views` — list the saved views defined for a given list (view name, ID, creator)
+- `get_saved_view_entries` — fetch list entries through a named saved view (respects that view's filters, sort order, and visible columns); accepts `list_id` + `view_id` or `view_name`
+
+**New types:** `AffinitySavedView`
+
+---
+
+### Phase 12 — Reminders
+
+Surface Affinity's task/reminder system so Claude can schedule follow-ups directly from conversation.
+
+**New API class:**
+- `src/affinity/reminders.ts`: `RemindersApi` with `getReminders`, `createReminder`, `updateReminder`, `deleteReminder` (all v1)
+
+**New MCP tools (`src/tools/reminders.ts`):**
+- `get_reminders` — list upcoming reminders; accepts optional `person_id` or `organization_id` filter
+- `create_reminder` — create a follow-up reminder; accepts `content`, `due_date`, and at least one of `person_id`/`organization_id`/`opportunity_id`
+- `update_reminder` — reschedule or update reminder content
+- `delete_reminder` — delete a reminder by ID (after it's been acted on)
+
+**New types:** `AffinityReminder`
+
+---
+
+### Phase 13 — v2 Rich Interactions & Note Threads
+
+Replace / supplement the v1 `/interactions` catch-all with v2's granular per-type endpoints, and add note reply thread support.
+
+**New API class:**
+- `src/affinity/interactions_v2.ts`: `InteractionsV2Api` with `getEmails`, `getCalls`, `getMeetings`, `getChatMessages` (all v2); each supports filtering by `id`, timestamp range (`sentAt`/`startTime`/`createdAt`), and pagination
+
+**Extends `src/affinity/notes.ts`:** add `getNoteReplies` (v2 `GET /v2/notes/{id}/replies`), `updateNote` (v1 `PUT /notes/{id}`), `deleteNote` (v1 `DELETE /notes/{id}`)
+
+**New MCP tools (`src/tools/interactions_v2.ts`):**
+- `get_emails` — email history with date-range filtering
+- `get_calls` — call history (v2-only; no v1 equivalent)
+- `get_meetings` — meeting history with richer metadata than v1
+- `get_chat_messages` — Slack/chat message history (v2-only)
+
+**Extend `src/tools/notes.ts`:**
+- `get_note_replies` — fetch reply thread for a note by `note_id`
+- `update_note` — update note content by ID
+- `delete_note` — delete a note by ID
+
+---
+
+### Phase 14 — Advanced Features & Beta
+
+**Semantic Search (v2 BETA):**
+- `src/affinity/semantic_search.ts`: `SemanticSearchApi` with `search` (v2 `POST /v2/semantic-search`)
+- MCP tool `semantic_search` — natural-language company search; accepts a free-text `query`, returns ranked company matches; clearly label as beta in tool description
+
+**Transcripts (v2 BETA):**
+- `src/affinity/transcripts.ts`: `TranscriptsApi` with `getTranscripts`, `getTranscript`, `getTranscriptFragments` (v2)
+- MCP tools `get_transcripts`, `get_transcript` — list and read call/meeting transcripts with fragment-level access
+
+**Deduplication (v2):**
+- Extend `src/affinity/people.ts` / `organizations.ts`: `mergePeople` (v2 `POST /v2/person-merges`), `mergeCompanies` (v2 `POST /v2/company-merges`)
+- MCP tools `merge_persons`, `merge_companies` — requires confirmation guard in the tool description; polls the async merge task status before returning
+
+**Utility:**
+- `get_whoami` — identify the authenticated user (v1 `GET /whoami` or v2 `GET /v2/auth/whoami`); useful for "who is the current API user?" and onboarding
+- `get_rate_limit` — return remaining monthly and per-minute quota (v1 `GET /rate-limit`)
+
+---
+
+## Deployment
+
+### Runtime: Cloudflare Workers
+- Deployed globally via `wrangler deploy`
+- No server provisioning or maintenance
+- Free tier supports low-to-moderate usage; paid tier for high volume
+
+### Transport: Streamable HTTP
+- The modern MCP transport (introduced 2025); replaces SSE
+- Stateless request/response — natural fit for Workers (no Durable Objects needed)
+- Supported by Claude Desktop and claude.ai
+- MCP endpoint: `https://affinity.trulock.com/mcp`
+
+### Authentication: Cloudflare Access
+- Protects the Worker URL at the network layer — no auth code to write
+- Team members authenticate via your identity provider (Google, Okta, GitHub, etc.)
+- Configure an Access Application pointing at the Worker URL
+- Service tokens available for programmatic/CI access
+
+### Secrets Management
+- Affinity API key stored as a **Worker Secret** (encrypted at rest, injected at runtime)
+- Set via: `wrangler secret put AFFINITY_API_KEY`
+- Never committed to source control; no `.env` file in production
+- Non-sensitive config (e.g. API base URLs) in `wrangler.toml` as `[vars]`
+
+### CI/CD: GitHub Actions
+- Workflow at `.github/workflows/deploy.yml` triggers on every push to `main`
+- Steps: checkout → `npm ci` → type-check → `wrangler deploy` → `wrangler secret put AFFINITY_API_KEY`
+- Requires two GitHub repo secrets: `CLOUDFLARE_API_TOKEN` and `AFFINITY_API_KEY`
+
+### Configuration (`wrangler.toml`)
+```toml
+name = "affinity-connector"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+
+[vars]
+AFFINITY_V1_BASE_URL = "https://api.affinity.co"
+AFFINITY_V2_BASE_URL = "https://api.affinity.co/v2"
+
+# AFFINITY_API_KEY — set via: wrangler secret put AFFINITY_API_KEY
+```
+
+---
+
+## Key Affinity API Details
+
+- **Auth**: Bearer auth — API key as Bearer token (Authorization: Bearer <key>)
+- **Rate limits**: ~900 req/min (standard)
+- **Docs**: https://affinity.co/documentation
+
+### API Versions
+
+Use whichever version exposes the richer or more reliable data for each domain:
+
+| Domain | Preferred Version | Notes |
+|--------|------------------|-------|
+| People | v2 | Richer field structure, pagination |
+| Organizations | v2 | Richer field structure, pagination |
+| Lists & entries | v1 | v2 list support is limited |
+| Notes | v1 | Only version available |
+| Interactions | v1 | Only version available |
+| Relationship intelligence | v1 | Strength scores, intro paths |
+
+- **v1 base URL**: `https://api.affinity.co/...`
+- **v2 base URL**: `https://api.affinity.co/v2/...`
+- The API client should support both base paths and document which version each method uses.
+- If Affinity expands v2 coverage over time, prefer migrating to v2 for consistency.
+
+---
+
+## Error Handling
+
+Basic error handling belongs in Phase 1 — the API client should handle these cases from the start to make development and debugging tractable.
+
+### HTTP Error Classes
+
+| Status | Meaning | Handling |
+|--------|---------|----------|
+| 401 | Bad/missing API key | Throw `AuthError` with clear message |
+| 403 | Insufficient permissions | Throw `PermissionError` |
+| 404 | Record not found | Return `null` or throw `NotFoundError` (tool-dependent) |
+| 429 | Rate limit exceeded | Retry with exponential backoff (up to 3 attempts) |
+| 5xx | Affinity server error | Throw `AffinityServerError`, surface to MCP caller |
+
+### Implementation Notes
+
+- Wrap all `fetch` calls in a shared `apiRequest()` helper that handles the above cases uniformly.
+- MCP tool handlers should catch errors and return them as structured MCP error responses rather than crashing the server.
+- Log errors with enough context (endpoint, status code, request ID if available) to diagnose issues.
+- Do not silently swallow errors — surface them clearly to Claude so it can inform the user.
+
+---
+
+## Target File Structure
+
+```
+AffinityConnector/
+├── src/
+│   ├── index.ts          # Worker entry point (fetch handler + MCP server)
+│   ├── server.ts         # Tool/resource registration
+│   ├── affinity/
+│   │   ├── client.ts     # Affinity API client (fetch-based, apiRequest helper)
+│   │   ├── people.ts     # People endpoints (v2)
+│   │   ├── organizations.ts  # Org endpoints (v2)
+│   │   ├── lists.ts      # List endpoints (v1)
+│   │   ├── notes.ts      # Notes endpoints (v1)
+│   │   └── types.ts      # TypeScript types for API responses
+│   └── tools/
+│       ├── people.ts     # MCP tool handlers
+│       ├── organizations.ts
+│       ├── lists.ts
+│       └── notes.ts
+├── .dev.vars             # Local dev secrets (gitignored)
+├── .env.example          # Documents required secrets
+├── wrangler.toml         # Workers config (deploy target, vars, bindings)
+├── package.json
+├── tsconfig.json
+└── README.md
+```
