@@ -93,6 +93,18 @@ describe('ListsApi.getListEntries', () => {
     await api.getListEntries(1, 25);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('includes page_token in request when provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ list_entries: [], next_page_token: null }), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new AffinityClient('key');
+    const api = new ListsApi(client);
+    await api.getListEntries(1, 25, 'tok-abc');
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain('page_token=tok-abc');
+  });
 });
 
 describe('ListsApi.getFieldValues', () => {

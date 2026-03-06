@@ -50,6 +50,15 @@ describe('PeopleApi.search', () => {
     expect(await api.search('nobody')).toEqual([]);
   });
 
+  it('returns an empty array when response has no persons key', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({}), { status: 200 })
+    ));
+    const client = new AffinityClient('key');
+    const api = new PeopleApi(client);
+    expect(await api.search('anything')).toEqual([]);
+  });
+
   it('serves results from cache on the second call', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ persons: [MOCK_PERSON] }), { status: 200 })

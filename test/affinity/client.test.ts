@@ -122,6 +122,17 @@ describe('AffinityClient error handling', () => {
     await expect(client.get('/test')).rejects.toThrow(AffinityServerError);
   });
 
+  it('falls back to statusText when error body is not JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('not-json', { status: 401, statusText: 'Unauthorized' }))
+    );
+    const client = new AffinityClient('key');
+    const err = await client.get('/test').catch((e) => e);
+    expect(err).toBeInstanceOf(AffinityAuthError);
+    expect(err.message).toBe('Unauthorized');
+  });
+
   it('throws a generic Error on unexpected status codes', async () => {
     mockFetch(418, { message: "I'm a teapot" });
     const client = new AffinityClient('key');

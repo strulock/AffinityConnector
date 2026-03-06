@@ -65,14 +65,14 @@ User (Claude Desktop / claude.ai)
 - `get_field_values` — custom field values for a list entry ✔
 
 ### Notes & Activity
-- `get_notes` — notes on a person or org
-- `create_note` — add a note to a record
-- `get_interactions` — email/meeting history
+- `get_notes` — notes on a person or org ✔
+- `create_note` — add a note to a record ✔
+- `get_interactions` — email/meeting history ✔
 
 ### Intelligence
-- `find_intro_path` — who can intro me to a target person/org
-- `get_relationship_strength` — relationship score data
-- `summarize_relationship` — AI-generated relationship summary
+- `find_intro_path` — who can intro me to a target person/org ✔
+- `get_relationship_strength` — relationship score data ✔
+- `summarize_relationship` — AI-generated relationship summary ✔
 
 ---
 
@@ -102,20 +102,25 @@ User (Claude Desktop / claude.ai)
 - New types: `AffinityOpportunity`, `AffinityListEntry`, `AffinityField`, `AffinityFieldValue`
 - Opportunities accessible via list entries (entity_type 8) — no separate tool needed
 
-### Phase 3 — Notes & Activity
-- Read notes from records
-- Write notes (create_note tool)
-- Interaction history (emails, meetings)
+### Phase 3 — Notes & Activity ✔ COMPLETE
+- `src/affinity/notes.ts`: `NotesApi` with `getNotes`, `createNote`, `getInteractions` (v1)
+- `src/tools/notes.ts`: `get_notes`, `create_note`, `get_interactions` tools
+- New types: `AffinityNote`, `AffinityInteraction`
+- Interaction types: 0 = email, 1 = meeting; filterable by person, org, or opportunity
 
-### Phase 4 — Intelligence Features
-- Relationship strength scoring
-- Intro path finder
-- Meeting prep brief generation (combines Affinity data + Claude synthesis)
+### Phase 4 — Intelligence Features ✔ COMPLETE
+- `src/affinity/intelligence.ts`: `IntelligenceApi` with `getRelationshipStrength` (v1)
+- `src/tools/intelligence.ts`: `get_relationship_strength`, `find_intro_path`, `summarize_relationship` tools
+- New type: `AffinityRelationshipStrength`
+- `find_intro_path` walks target person's organizations, collects members, ranks by relationship strength
+- `summarize_relationship` aggregates profile + strength + recent notes + interactions into one briefing
 
-### Phase 5 — Polish
-- Caching layer using **Cloudflare KV** (avoid redundant API calls)
-- Claude Desktop + claude.ai connection documentation
-- README with setup and deployment guide
+### Phase 5 — Polish ✔ COMPLETE
+- `src/cache.ts`: `KVCache` wrapper around Cloudflare KV; no-op fallback when KV unavailable (local dev)
+- Per-category TTLs: profiles 5 min, lists 10 min, list entries 5 min, notes/interactions 2 min, strength 5 min
+- Cache wired into all API classes: `people.ts`, `organizations.ts`, `lists.ts`, `notes.ts`, `intelligence.ts`
+- KV namespace `affinity-connector-cache` created in Cloudflare; binding added to `wrangler.toml`
+- `README.md`: full tool reference, claude.ai + Claude Desktop connection instructions, deployment guide
 
 ---
 

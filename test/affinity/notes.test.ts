@@ -63,6 +63,18 @@ describe('NotesApi.getNotes', () => {
     await api.getNotes({ person_id: 1 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('includes page_token in request when provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([]), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new AffinityClient('key');
+    const api = new NotesApi(client);
+    await api.getNotes({ person_id: 1, page_token: 'tok-xyz' });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain('page_token=tok-xyz');
+  });
 });
 
 describe('NotesApi.createNote', () => {
@@ -131,5 +143,17 @@ describe('NotesApi.getInteractions', () => {
     await api.getInteractions({ person_id: 1 });
     await api.getInteractions({ person_id: 1 });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('includes page_token in request when provided', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([]), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new AffinityClient('key');
+    const api = new NotesApi(client);
+    await api.getInteractions({ person_id: 1, page_token: 'tok-abc' });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain('page_token=tok-abc');
   });
 });
