@@ -3,7 +3,7 @@ import { AffinityClient } from '../../src/affinity/client.js';
 import { ListsApi } from '../../src/affinity/lists.js';
 import { registerListTools } from '../../src/tools/lists.js';
 import { makeMockServer } from '../helpers/mock-server.js';
-import type { AffinityList, AffinityListEntry, AffinityFieldValue, AffinityPerson, AffinityOrganization, AffinityOpportunity } from '../../src/affinity/types.js';
+import type { AffinityList, AffinityListEntry, AffinityFieldValue, AffinityPerson, AffinityOrganization, AffinityOpportunity, AffinitySavedView } from '../../src/affinity/types.js';
 
 const MOCK_LIST: AffinityList = { id: 1, type: 1, name: 'Pipeline', public: true, owner_id: 99, list_size: 5, created_at: '2023-01-01T00:00:00Z' };
 const MOCK_PRIVATE_LIST: AffinityList = { ...MOCK_LIST, id: 2, type: 0, name: 'Contacts', public: false };
@@ -154,15 +154,23 @@ describe('get_field_values tool', () => {
   });
 });
 
+const BASE_MOCK_API = () => ({
+  getLists: vi.fn(),
+  getListEntries: vi.fn(),
+  getFieldValues: vi.fn(),
+  setFieldValue: vi.fn(),
+  deleteFieldValue: vi.fn(),
+  addListEntry: vi.fn(),
+  removeListEntry: vi.fn(),
+  getSavedViews: vi.fn(),
+  getSavedViewEntries: vi.fn(),
+});
+
 describe('set_field_value tool', () => {
   const CREATED_VALUE = { id: 300, field_id: 5, entity_type: 1, entity_id: 10, list_entry_id: 101, value: 'Series B' };
 
   it('returns Created confirmation when creating a new value', async () => {
-    const mockApi = {
-      getLists: vi.fn(), getListEntries: vi.fn(), getFieldValues: vi.fn(),
-      setFieldValue: vi.fn().mockResolvedValue(CREATED_VALUE),
-      deleteFieldValue: vi.fn(),
-    };
+    const mockApi = { ...BASE_MOCK_API(), setFieldValue: vi.fn().mockResolvedValue(CREATED_VALUE) };
     const { server, callTool } = makeMockServer();
     registerListTools(server, mockApi);
     const result = await callTool('set_field_value', { field_id: 5, value: 'Series B', list_entry_id: 101, entity_id: 10, entity_type: 1 });
@@ -172,11 +180,7 @@ describe('set_field_value tool', () => {
   });
 
   it('returns Updated confirmation when field_value_id is provided', async () => {
-    const mockApi = {
-      getLists: vi.fn(), getListEntries: vi.fn(), getFieldValues: vi.fn(),
-      setFieldValue: vi.fn().mockResolvedValue({ ...CREATED_VALUE, id: 200 }),
-      deleteFieldValue: vi.fn(),
-    };
+    const mockApi = { ...BASE_MOCK_API(), setFieldValue: vi.fn().mockResolvedValue({ ...CREATED_VALUE, id: 200 }) };
     const { server, callTool } = makeMockServer();
     registerListTools(server, mockApi);
     const result = await callTool('set_field_value', { field_id: 5, value: 'Series B', field_value_id: 200 });
@@ -194,16 +198,101 @@ describe('set_field_value tool', () => {
 
 describe('delete_field_value tool', () => {
   it('returns success message after deletion', async () => {
-    const mockApi = {
-      getLists: vi.fn(), getListEntries: vi.fn(), getFieldValues: vi.fn(),
-      setFieldValue: vi.fn(),
-      deleteFieldValue: vi.fn().mockResolvedValue(undefined),
-    };
+    const mockApi = { ...BASE_MOCK_API(), deleteFieldValue: vi.fn().mockResolvedValue(undefined) };
     const { server, callTool } = makeMockServer();
     registerListTools(server, mockApi);
     const result = await callTool('delete_field_value', { field_value_id: 200 });
     expect(mockApi.deleteFieldValue).toHaveBeenCalledWith(200);
     expect(result.content[0].text).toContain('200');
     expect(result.content[0].text).toContain('deleted successfully');
+  });
+});
+
+const MOCK_SAVED_VIEW: AffinitySavedView = {
+  id: 10, list_id: 1, name: 'My View', creator_id: 99, is_public: true,
+};
+
+describe('add_to_list tool', () => {
+  it('returns success with the new list entry ID', async () => {
+    const newEntry = { ...PERSON_ENTRY, id: 999 };
+    const mockApi = { ...BASE_MOCK_API(), addListEntry: vi.fn().mockResolvedValue(newEntry) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('add_to_list', { list_id: 1, entity_id: 1, entity_type: 0 });
+    expect(mockApi.addListEntry).toHaveBeenCalledWith(1, 1, 0);
+    expect(result.content[0].text).toContain('999');
+    expect(result.content[0].text).toContain('list 1');
+  });
+});
+
+describe('remove_from_list tool', () => {
+  it('returns success message after removal', async () => {
+    const mockApi = { ...BASE_MOCK_API(), removeListEntry: vi.fn().mockResolvedValue(undefined) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('remove_from_list', { list_id: 1, list_entry_id: 100 });
+    expect(mockApi.removeListEntry).toHaveBeenCalledWith(1, 100);
+    expect(result.content[0].text).toContain('100');
+    expect(result.content[0].text).toContain('list 1');
+  });
+});
+
+describe('get_saved_views tool', () => {
+  it('returns formatted saved views', async () => {
+    const mockApi = { ...BASE_MOCK_API(), getSavedViews: vi.fn().mockResolvedValue([MOCK_SAVED_VIEW]) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('get_saved_views', { list_id: 1 });
+    const text = result.content[0].text;
+    expect(text).toContain('My View');
+    expect(text).toContain('[view:10]');
+    expect(text).toContain('public');
+    expect(text).toContain('1 saved view');
+  });
+
+  it('returns a message when no saved views exist', async () => {
+    const mockApi = { ...BASE_MOCK_API(), getSavedViews: vi.fn().mockResolvedValue([]) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('get_saved_views', { list_id: 1 });
+    expect(result.content[0].text).toContain('No saved views found');
+  });
+
+  it('labels private views correctly', async () => {
+    const privateView = { ...MOCK_SAVED_VIEW, is_public: false };
+    const mockApi = { ...BASE_MOCK_API(), getSavedViews: vi.fn().mockResolvedValue([privateView]) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('get_saved_views', { list_id: 1 });
+    expect(result.content[0].text).toContain('private');
+  });
+});
+
+describe('get_saved_view_entries tool', () => {
+  it('returns formatted entries', async () => {
+    const mockApi = { ...BASE_MOCK_API(), getSavedViewEntries: vi.fn().mockResolvedValue({ entries: [PERSON_ENTRY], nextPageToken: undefined }) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('get_saved_view_entries', { list_id: 1, view_id: 10, limit: 25 });
+    const text = result.content[0].text;
+    expect(text).toContain('Alice Smith');
+    expect(text).toContain('view 10');
+    expect(text).toContain('list 1');
+  });
+
+  it('shows pagination token when more entries available', async () => {
+    const mockApi = { ...BASE_MOCK_API(), getSavedViewEntries: vi.fn().mockResolvedValue({ entries: [PERSON_ENTRY], nextPageToken: 'tok-abc' }) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('get_saved_view_entries', { list_id: 1, view_id: 10, limit: 25 });
+    expect(result.content[0].text).toContain('tok-abc');
+  });
+
+  it('returns a message when no entries exist', async () => {
+    const mockApi = { ...BASE_MOCK_API(), getSavedViewEntries: vi.fn().mockResolvedValue({ entries: [], nextPageToken: undefined }) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('get_saved_view_entries', { list_id: 1, view_id: 10, limit: 25 });
+    expect(result.content[0].text).toContain('No entries found');
   });
 });

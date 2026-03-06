@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest';
 import { AffinityClient } from '../../src/affinity/client.js';
 import { ListsApi } from '../../src/affinity/lists.js';
 import { makeKVMock } from '../helpers/kv-mock.js';
-import type { AffinityList, AffinityListEntry, AffinityFieldValue } from '../../src/affinity/types.js';
+import type { AffinityList, AffinityListEntry, AffinityFieldValue, AffinitySavedView } from '../../src/affinity/types.js';
 
 const MOCK_LIST: AffinityList = {
   id: 1,
@@ -186,5 +186,111 @@ describe('ListsApi.deleteFieldValue', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
     const api = new ListsApi(new AffinityClient('key'));
     await expect(api.deleteFieldValue(200)).resolves.toBeUndefined();
+  });
+});
+
+const MOCK_ENTRY_RESULT: AffinityListEntry = {
+  id: 500,
+  list_id: 1,
+  entity_id: 10,
+  entity_type: 1,
+  entity: { id: 10, name: 'Acme', domain: 'acme.com', domains: ['acme.com'], person_ids: [], opportunity_ids: [], list_entries: [], interaction_dates: { first_email_date: null, last_email_date: null, first_event_date: null, last_event_date: null, last_interaction_date: null, next_event_date: null }, created_at: '2023-01-01T00:00:00Z' },
+  creator_id: 99,
+  created_at: '2024-01-01T00:00:00Z',
+};
+
+const MOCK_SAVED_VIEW: AffinitySavedView = {
+  id: 10,
+  list_id: 1,
+  name: 'My View',
+  creator_id: 99,
+  is_public: true,
+};
+
+describe('ListsApi.addListEntry', () => {
+  it('POSTs to /lists/{id}/list-entries and returns the new entry', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(MOCK_ENTRY_RESULT), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new ListsApi(new AffinityClient('key'));
+    const result = await api.addListEntry(1, 10, 1);
+    expect(result).toEqual(MOCK_ENTRY_RESULT);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/lists/1/list-entries');
+    expect((init as RequestInit).method).toBe('POST');
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body).toEqual({ entity_id: 10, entity_type: 1 });
+  });
+});
+
+describe('ListsApi.removeListEntry', () => {
+  it('sends DELETE to /lists/{id}/list-entries/{entry_id}', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ success: true }), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new ListsApi(new AffinityClient('key'));
+    await api.removeListEntry(1, 500);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/lists/1/list-entries/500');
+    expect((init as RequestInit).method).toBe('DELETE');
+  });
+
+  it('handles 204 No Content response without throwing', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
+    const api = new ListsApi(new AffinityClient('key'));
+    await expect(api.removeListEntry(1, 500)).resolves.toBeUndefined();
+  });
+});
+
+describe('ListsApi.getSavedViews', () => {
+  it('returns saved views from the v2 API', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify([MOCK_SAVED_VIEW]), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new ListsApi(new AffinityClient('key'));
+    const result = await api.getSavedViews(1);
+    expect(result).toEqual([MOCK_SAVED_VIEW]);
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain('/v2/');
+    expect(url).toContain('/lists/1/saved-views');
+  });
+
+  it('serves results from cache on the second call', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify([MOCK_SAVED_VIEW]), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new ListsApi(new AffinityClient('key', { cache: makeKVMock() }));
+    await api.getSavedViews(1);
+    await api.getSavedViews(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('ListsApi.getSavedViewEntries', () => {
+  it('returns entries from the v2 API', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ list_entries: [MOCK_ENTRY_RESULT], next_page_token: null }), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new ListsApi(new AffinityClient('key'));
+    const result = await api.getSavedViewEntries(1, 10);
+    expect(result.entries).toEqual([MOCK_ENTRY_RESULT]);
+    expect(result.nextPageToken).toBeUndefined();
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain('/v2/');
+    expect(url).toContain('/lists/1/saved-views/10/list-entries');
+  });
+
+  it('returns nextPageToken when present', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ list_entries: [], next_page_token: 'tok-xyz' }), { status: 200 }))
+    ));
+    const api = new ListsApi(new AffinityClient('key'));
+    const result = await api.getSavedViewEntries(1, 10, 25);
+    expect(result.nextPageToken).toBe('tok-xyz');
   });
 });

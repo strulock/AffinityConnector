@@ -2,7 +2,7 @@
 
 import { AffinityClient } from './client.js';
 import { CACHE_TTL } from '../cache.js';
-import type { AffinityList, AffinityListEntry, AffinityFieldValue } from './types.js';
+import type { AffinityList, AffinityListEntry, AffinityFieldValue, AffinitySavedView } from './types.js';
 
 export class ListsApi {
   constructor(private client: AffinityClient) {}
@@ -81,5 +81,53 @@ export class ListsApi {
   /** Delete a field value by its ID (v1 DELETE /field-values/{id}). */
   async deleteFieldValue(fieldValueId: number): Promise<void> {
     await this.client.del<{ success: boolean }>(`/field-values/${fieldValueId}`);
+  }
+
+  /** Add an entity to a list (v1 POST /lists/{id}/list-entries). */
+  async addListEntry(listId: number, entityId: number, entityType: number): Promise<AffinityListEntry> {
+    return this.client.post<AffinityListEntry>(`/lists/${listId}/list-entries`, {
+      entity_id: entityId,
+      entity_type: entityType,
+    });
+  }
+
+  /** Remove a list entry (v1 DELETE /lists/{id}/list-entries/{entry_id}). */
+  async removeListEntry(listId: number, listEntryId: number): Promise<void> {
+    await this.client.del<{ success: boolean }>(`/lists/${listId}/list-entries/${listEntryId}`);
+  }
+
+  /** Fetch all saved views for a list (v2 GET /v2/lists/{id}/saved-views). */
+  async getSavedViews(listId: number): Promise<AffinitySavedView[]> {
+    const cacheKey = `saved-views:${listId}`;
+    const cached = await this.client.cache.get<AffinitySavedView[]>(cacheKey);
+    if (cached) return cached;
+
+    const views = await this.client.get<AffinitySavedView[]>(`/lists/${listId}/saved-views`, undefined, 'v2');
+    await this.client.cache.set(cacheKey, views, CACHE_TTL.list);
+    return views;
+  }
+
+  /**
+   * Fetch list entries through a saved view (v2).
+   * Respects the view's filters, sort order, and visible columns.
+   */
+  async getSavedViewEntries(
+    listId: number,
+    viewId: number,
+    limit = 25,
+    pageToken?: string,
+  ): Promise<{ entries: AffinityListEntry[]; nextPageToken?: string }> {
+    const params: Record<string, unknown> = { page_size: limit };
+    if (pageToken) params.page_token = pageToken;
+
+    const result = await this.client.get<{
+      list_entries: AffinityListEntry[];
+      next_page_token?: string | null;
+    }>(`/lists/${listId}/saved-views/${viewId}/list-entries`, params, 'v2');
+
+    return {
+      entries: result.list_entries ?? [],
+      nextPageToken: result.next_page_token ?? undefined,
+    };
   }
 }

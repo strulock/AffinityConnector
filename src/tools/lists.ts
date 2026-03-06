@@ -181,4 +181,78 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
       };
     }
   );
+
+  server.tool(
+    'add_to_list',
+    'Add a person, organization, or opportunity to an Affinity list. Use get_lists to find list IDs.',
+    {
+      list_id: z.number().int().describe('List ID to add to (from get_lists)'),
+      entity_id: z.number().int().describe('ID of the person, org, or opportunity to add'),
+      entity_type: z.number().int().describe('Entity type: 0 = person, 1 = organization, 8 = opportunity'),
+    },
+    async ({ list_id, entity_id, entity_type }) => {
+      const entry = await api.addListEntry(list_id, entity_id, entity_type);
+      return {
+        content: [{ type: 'text', text: `Added entity ${entity_id} to list ${list_id}. List entry ID: ${entry.id}.` }],
+      };
+    }
+  );
+
+  server.tool(
+    'remove_from_list',
+    'Remove an entry from an Affinity list by its list entry ID. Use get_list_entries to find list entry IDs.',
+    {
+      list_id: z.number().int().describe('List ID containing the entry (from get_lists)'),
+      list_entry_id: z.number().int().describe('List entry ID to remove (from get_list_entries)'),
+    },
+    async ({ list_id, list_entry_id }) => {
+      await api.removeListEntry(list_id, list_entry_id);
+      return {
+        content: [{ type: 'text', text: `List entry ${list_entry_id} removed from list ${list_id}.` }],
+      };
+    }
+  );
+
+  server.tool(
+    'get_saved_views',
+    'List all saved views defined for an Affinity list. Each view has a name and ID that can be used with get_saved_view_entries.',
+    {
+      list_id: z.number().int().describe('List ID (from get_lists)'),
+    },
+    async ({ list_id }) => {
+      const views = await api.getSavedViews(list_id);
+      if (views.length === 0) {
+        return { content: [{ type: 'text', text: `No saved views found for list ${list_id}.` }] };
+      }
+      const lines = views.map(
+        v => `[view:${v.id}] ${v.name} — by user ${v.creator_id}${v.is_public ? ', public' : ', private'}`
+      );
+      return {
+        content: [{ type: 'text', text: `${views.length} saved view(s) for list ${list_id}:\n\n${lines.join('\n')}` }],
+      };
+    }
+  );
+
+  server.tool(
+    'get_saved_view_entries',
+    'Fetch list entries through a saved view, respecting its filters and sort order. Use get_saved_views to find view IDs.',
+    {
+      list_id: z.number().int().describe('List ID (from get_lists)'),
+      view_id: z.number().int().describe('Saved view ID (from get_saved_views)'),
+      limit: z.number().int().min(1).max(100).default(25).describe('Max entries to return'),
+      page_token: z.string().optional().describe('Pagination token from a previous call'),
+    },
+    async ({ list_id, view_id, limit, page_token }) => {
+      const { entries, nextPageToken } = await api.getSavedViewEntries(list_id, view_id, limit, page_token);
+      if (entries.length === 0) {
+        return { content: [{ type: 'text', text: `No entries found in view ${view_id} of list ${list_id}.` }] };
+      }
+      const lines = entries.map(formatEntry);
+      let text = `${entries.length} entries from view ${view_id} of list ${list_id}:\n\n${lines.join('\n')}`;
+      if (nextPageToken) {
+        text += `\n\nMore entries available. Use page_token: "${nextPageToken}"`;
+      }
+      return { content: [{ type: 'text', text }] };
+    }
+  );
 }

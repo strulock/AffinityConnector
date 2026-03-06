@@ -137,6 +137,14 @@ export interface AffinityRelationshipStrength {
   last_activity_date: string | null;
 }
 
+export interface AffinitySavedView {
+  id: number;
+  list_id: number;
+  name: string;
+  creator_id: number;
+  is_public: boolean;
+}
+
 export interface AffinityFieldValueChange {
   id: number;
   field_id: number;
