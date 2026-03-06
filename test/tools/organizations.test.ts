@@ -102,3 +102,47 @@ describe('get_organization tool', () => {
     expect(text).toContain('N/A');
   });
 });
+
+describe('create_organization tool', () => {
+  it('returns a success message with the created org ID and name', async () => {
+    const { callTool } = setup(MOCK_ORG);
+    const result = await callTool('create_organization', { name: 'Acme Corp' });
+    const text = result.content[0].text;
+    expect(text).toContain('Created organization');
+    expect(text).toContain('[id:10]');
+    expect(text).toContain('Acme Corp');
+  });
+
+  it('passes optional fields through to the API', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(MOCK_ORG), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new AffinityClient('key');
+    const api = new OrganizationsApi(client);
+    const { server, callTool } = makeMockServer();
+    registerOrganizationTools(server, api);
+    await callTool('create_organization', { name: 'Acme Corp', domain: 'acme.com', person_ids: [1, 2] });
+    const body = JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string);
+    expect(body.domain).toBe('acme.com');
+    expect(body.person_ids).toEqual([1, 2]);
+  });
+});
+
+describe('update_organization tool', () => {
+  it('returns a success message with the updated org ID and name', async () => {
+    const updated = { ...MOCK_ORG, name: 'Acme Inc' };
+    const { callTool } = setup(updated);
+    const result = await callTool('update_organization', { org_id: 10, name: 'Acme Inc' });
+    const text = result.content[0].text;
+    expect(text).toContain('Updated organization');
+    expect(text).toContain('[id:10]');
+    expect(text).toContain('Acme Inc');
+  });
+
+  it('returns an error message when no fields are provided', async () => {
+    const { callTool } = setup(MOCK_ORG);
+    const result = await callTool('update_organization', { org_id: 10 });
+    expect(result.content[0].text).toContain('Provide at least one field to update');
+  });
+});

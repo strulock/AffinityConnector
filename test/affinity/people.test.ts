@@ -109,3 +109,64 @@ describe('PeopleApi.getById', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('PeopleApi.create', () => {
+  it('POSTs to /persons and returns the created person', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(MOCK_PERSON), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new PeopleApi(new AffinityClient('key'));
+    const result = await api.create({ first_name: 'Alice', last_name: 'Smith', emails: ['alice@example.com'] });
+    expect(result).toEqual(MOCK_PERSON);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/persons');
+    expect((init as RequestInit).method).toBe('POST');
+  });
+
+  it('sends all provided fields in the request body', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(MOCK_PERSON), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new PeopleApi(new AffinityClient('key'));
+    await api.create({ first_name: 'Alice', last_name: 'Smith', emails: ['alice@example.com'], organization_ids: [10] });
+    const body = JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string);
+    expect(body.first_name).toBe('Alice');
+    expect(body.last_name).toBe('Smith');
+    expect(body.emails).toEqual(['alice@example.com']);
+    expect(body.organization_ids).toEqual([10]);
+  });
+});
+
+describe('PeopleApi.update', () => {
+  it('PUTs to /persons/{id} and returns the updated person', async () => {
+    const updated = { ...MOCK_PERSON, first_name: 'Alicia' };
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(updated), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new PeopleApi(new AffinityClient('key'));
+    const result = await api.update(1, { first_name: 'Alicia' });
+    expect(result.first_name).toBe('Alicia');
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/persons/1');
+    expect((init as RequestInit).method).toBe('PUT');
+  });
+
+  it('writes the updated person to the cache', async () => {
+    const updated = { ...MOCK_PERSON, first_name: 'Alicia' };
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(updated), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const cache = makeKVMock();
+    const api = new PeopleApi(new AffinityClient('key', { cache }));
+    await api.update(1, { first_name: 'Alicia' });
+    // getById should now be served from cache without a second fetch
+    vi.stubGlobal('fetch', vi.fn());
+    const cached = await api.getById(1);
+    expect(cached.first_name).toBe('Alicia');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});

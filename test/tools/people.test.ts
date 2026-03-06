@@ -113,3 +113,52 @@ describe('get_person tool', () => {
     expect(text).toContain('N/A');
   });
 });
+
+describe('create_person tool', () => {
+  it('returns a success message with the created person ID and name', async () => {
+    const { callTool } = setup(MOCK_PERSON);
+    const result = await callTool('create_person', { first_name: 'Alice', last_name: 'Smith' });
+    const text = result.content[0].text;
+    expect(text).toContain('Created person');
+    expect(text).toContain('[id:1]');
+    expect(text).toContain('Alice Smith');
+  });
+
+  it('passes optional fields through to the API', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(MOCK_PERSON), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new AffinityClient('key');
+    const api = new PeopleApi(client);
+    const { server, callTool } = makeMockServer();
+    registerPeopleTools(server, api);
+    await callTool('create_person', {
+      first_name: 'Alice',
+      last_name: 'Smith',
+      emails: ['alice@example.com'],
+      organization_ids: [10],
+    });
+    const body = JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string);
+    expect(body.emails).toEqual(['alice@example.com']);
+    expect(body.organization_ids).toEqual([10]);
+  });
+});
+
+describe('update_person tool', () => {
+  it('returns a success message with the updated person ID and name', async () => {
+    const updated = { ...MOCK_PERSON, first_name: 'Alicia' };
+    const { callTool } = setup(updated);
+    const result = await callTool('update_person', { person_id: 1, first_name: 'Alicia' });
+    const text = result.content[0].text;
+    expect(text).toContain('Updated person');
+    expect(text).toContain('[id:1]');
+    expect(text).toContain('Alicia');
+  });
+
+  it('returns an error message when no fields are provided', async () => {
+    const { callTool } = setup(MOCK_PERSON);
+    const result = await callTool('update_person', { person_id: 1 });
+    expect(result.content[0].text).toContain('Provide at least one field to update');
+  });
+});

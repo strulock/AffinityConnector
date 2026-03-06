@@ -22,9 +22,28 @@ export class OrganizationsApi {
     return orgs;
   }
 
+  /** Create a new organization record (v1 POST /organizations). */
+  async create(params: {
+    name: string;
+    domain?: string;
+    person_ids?: number[];
+  }): Promise<AffinityOrganization> {
+    return this.client.post<AffinityOrganization>('/organizations', params);
+  }
+
   /**
-   * Get a single organization by ID, with full field data.
+   * Update an existing organization (v1 PUT /organizations/{id}).
+   * Only supplied fields are changed. Updates the cache on success.
    */
+  async update(
+    orgId: number,
+    params: { name?: string; domain?: string; person_ids?: number[] },
+  ): Promise<AffinityOrganization> {
+    const org = await this.client.put<AffinityOrganization>(`/organizations/${orgId}`, params);
+    await this.client.cache.set(`orgs:${orgId}`, org, CACHE_TTL.profile);
+    return org;
+  }
+
   async getById(orgId: number): Promise<AffinityOrganization> {
     const cacheKey = `orgs:${orgId}`;
     const cached = await this.client.cache.get<AffinityOrganization>(cacheKey);

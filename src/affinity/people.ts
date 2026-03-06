@@ -22,9 +22,30 @@ export class PeopleApi {
     return people;
   }
 
+  /** Create a new person record (v1 POST /persons). */
+  async create(params: {
+    first_name: string;
+    last_name: string;
+    emails?: string[];
+    organization_ids?: number[];
+    phone_numbers?: string[];
+  }): Promise<AffinityPerson> {
+    return this.client.post<AffinityPerson>('/persons', params);
+  }
+
   /**
-   * Get a single person by ID, with full field data.
+   * Update an existing person (v1 PUT /persons/{id}).
+   * Only supplied fields are changed. Updates the cache on success.
    */
+  async update(
+    personId: number,
+    params: { first_name?: string; last_name?: string; emails?: string[]; organization_ids?: number[]; phone_numbers?: string[] },
+  ): Promise<AffinityPerson> {
+    const person = await this.client.put<AffinityPerson>(`/persons/${personId}`, params);
+    await this.client.cache.set(`people:${personId}`, person, CACHE_TTL.profile);
+    return person;
+  }
+
   async getById(personId: number): Promise<AffinityPerson> {
     const cacheKey = `people:${personId}`;
     const cached = await this.client.cache.get<AffinityPerson>(cacheKey);

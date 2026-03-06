@@ -68,4 +68,42 @@ export function registerOrganizationTools(server: McpServer, api: OrganizationsA
       return { content: [{ type: 'text', text }] };
     }
   );
+
+  server.tool(
+    'create_organization',
+    'Create a new Affinity organization (company). Provide a name; optionally include a domain and person_ids to associate.',
+    {
+      name: z.string().describe('Company name'),
+      domain: z.string().optional().describe('Primary domain (e.g. acme.com)'),
+      person_ids: z.array(z.number().int()).optional().describe('Person IDs to associate with this org'),
+    },
+    async ({ name, domain, person_ids }) => {
+      const org = await api.create({ name, domain, person_ids });
+      return {
+        content: [{ type: 'text', text: `Created organization [id:${org.id}] "${org.name}".` }],
+      };
+    }
+  );
+
+  server.tool(
+    'update_organization',
+    'Update an existing Affinity organization by ID. Supply only the fields you want to change.',
+    {
+      org_id: z.number().int().describe('Organization ID to update'),
+      name: z.string().optional().describe('New company name'),
+      domain: z.string().optional().describe('New primary domain'),
+      person_ids: z.array(z.number().int()).optional().describe('Replacement person ID list (replaces current)'),
+    },
+    async ({ org_id, name, domain, person_ids }) => {
+      if (!name && !domain && !person_ids) {
+        return {
+          content: [{ type: 'text', text: 'Provide at least one field to update.' }],
+        };
+      }
+      const org = await api.update(org_id, { name, domain, person_ids });
+      return {
+        content: [{ type: 'text', text: `Updated organization [id:${org.id}] "${org.name}".` }],
+      };
+    }
+  );
 }

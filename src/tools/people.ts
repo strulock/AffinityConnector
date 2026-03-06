@@ -70,4 +70,48 @@ export function registerPeopleTools(server: McpServer, api: PeopleApi): void {
       return { content: [{ type: 'text', text }] };
     }
   );
+
+  server.tool(
+    'create_person',
+    'Create a new Affinity contact. Provide first_name and last_name at minimum; optionally include emails, organization_ids, and phone_numbers.',
+    {
+      first_name: z.string().describe('First name'),
+      last_name: z.string().describe('Last name'),
+      emails: z.array(z.string().email()).optional().describe('Email addresses'),
+      organization_ids: z.array(z.number().int()).optional().describe('Organization IDs to associate'),
+      phone_numbers: z.array(z.string()).optional().describe('Phone numbers'),
+    },
+    async ({ first_name, last_name, emails, organization_ids, phone_numbers }) => {
+      const person = await api.create({ first_name, last_name, emails, organization_ids, phone_numbers });
+      const name = [person.first_name, person.last_name].filter(Boolean).join(' ');
+      return {
+        content: [{ type: 'text', text: `Created person [id:${person.id}] "${name}".` }],
+      };
+    }
+  );
+
+  server.tool(
+    'update_person',
+    'Update an existing Affinity contact by ID. Supply only the fields you want to change.',
+    {
+      person_id: z.number().int().describe('Person ID to update'),
+      first_name: z.string().optional().describe('New first name'),
+      last_name: z.string().optional().describe('New last name'),
+      emails: z.array(z.string().email()).optional().describe('Replacement email list (replaces current)'),
+      organization_ids: z.array(z.number().int()).optional().describe('Replacement organization ID list'),
+      phone_numbers: z.array(z.string()).optional().describe('Replacement phone number list'),
+    },
+    async ({ person_id, first_name, last_name, emails, organization_ids, phone_numbers }) => {
+      if (!first_name && !last_name && !emails && !organization_ids && !phone_numbers) {
+        return {
+          content: [{ type: 'text', text: 'Provide at least one field to update.' }],
+        };
+      }
+      const person = await api.update(person_id, { first_name, last_name, emails, organization_ids, phone_numbers });
+      const name = [person.first_name, person.last_name].filter(Boolean).join(' ');
+      return {
+        content: [{ type: 'text', text: `Updated person [id:${person.id}] "${name}".` }],
+      };
+    }
+  );
 }

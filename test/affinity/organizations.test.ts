@@ -90,3 +90,63 @@ describe('OrganizationsApi.getById', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('OrganizationsApi.create', () => {
+  it('POSTs to /organizations and returns the created org', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(MOCK_ORG), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new OrganizationsApi(new AffinityClient('key'));
+    const result = await api.create({ name: 'Acme Corp', domain: 'acme.com' });
+    expect(result).toEqual(MOCK_ORG);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/organizations');
+    expect((init as RequestInit).method).toBe('POST');
+  });
+
+  it('sends all provided fields in the request body', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(MOCK_ORG), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new OrganizationsApi(new AffinityClient('key'));
+    await api.create({ name: 'Acme Corp', domain: 'acme.com', person_ids: [1, 2] });
+    const body = JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string);
+    expect(body.name).toBe('Acme Corp');
+    expect(body.domain).toBe('acme.com');
+    expect(body.person_ids).toEqual([1, 2]);
+  });
+});
+
+describe('OrganizationsApi.update', () => {
+  it('PUTs to /organizations/{id} and returns the updated org', async () => {
+    const updated = { ...MOCK_ORG, name: 'Acme Inc' };
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(updated), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new OrganizationsApi(new AffinityClient('key'));
+    const result = await api.update(10, { name: 'Acme Inc' });
+    expect(result.name).toBe('Acme Inc');
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/organizations/10');
+    expect((init as RequestInit).method).toBe('PUT');
+  });
+
+  it('writes the updated org to the cache', async () => {
+    const updated = { ...MOCK_ORG, name: 'Acme Inc' };
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(updated), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const cache = makeKVMock();
+    const api = new OrganizationsApi(new AffinityClient('key', { cache }));
+    await api.update(10, { name: 'Acme Inc' });
+    // getById should now be served from cache without a second fetch
+    vi.stubGlobal('fetch', vi.fn());
+    const cached = await api.getById(10);
+    expect(cached.name).toBe('Acme Inc');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
