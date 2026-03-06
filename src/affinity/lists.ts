@@ -1,3 +1,5 @@
+// Affinity v1 list endpoints: /lists, /lists/:id/list-entries, /field-values
+
 import { AffinityClient } from './client.js';
 import { CACHE_TTL } from '../cache.js';
 import type { AffinityList, AffinityListEntry, AffinityFieldValue } from './types.js';
@@ -5,6 +7,7 @@ import type { AffinityList, AffinityListEntry, AffinityFieldValue } from './type
 export class ListsApi {
   constructor(private client: AffinityClient) {}
 
+  /** Fetch all lists in the workspace (pipelines, contact lists, etc.). */
   async getLists(): Promise<AffinityList[]> {
     const cacheKey = 'lists:all';
     const cached = await this.client.cache.get<AffinityList[]>(cacheKey);
@@ -15,6 +18,10 @@ export class ListsApi {
     return lists;
   }
 
+  /**
+   * Fetch entries for a list. The v1 response wraps entries in `list_entries` with a
+   * `next_page_token` cursor; we normalise this to `{ entries, nextPageToken }`.
+   */
   async getListEntries(
     listId: number,
     limit = 25,
@@ -38,6 +45,7 @@ export class ListsApi {
     return response;
   }
 
+  /** Fetch all custom field values for a specific list entry. Returns an array directly. */
   async getFieldValues(listEntryId: number): Promise<AffinityFieldValue[]> {
     const cacheKey = `field-values:${listEntryId}`;
     const cached = await this.client.cache.get<AffinityFieldValue[]>(cacheKey);

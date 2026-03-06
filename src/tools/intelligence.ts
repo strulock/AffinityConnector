@@ -1,3 +1,6 @@
+// MCP tools for relationship intelligence: strength scores, intro paths, and
+// full relationship summaries that aggregate profile + notes + interactions.
+
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { IntelligenceApi } from '../affinity/intelligence.js';
@@ -107,6 +110,8 @@ export function registerIntelligenceTools(
             const s = await api.getRelationshipStrength(id, 0);
             return { id, strength: s.strength, lastActivity: s.last_activity_date };
           } catch {
+            // Strength unavailable for this connector — include them with score 0
+            // rather than dropping them from results entirely.
             return { id, strength: 0, lastActivity: null };
           }
         })

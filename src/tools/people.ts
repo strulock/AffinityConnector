@@ -1,3 +1,5 @@
+// MCP tools for searching and retrieving Affinity people (contacts).
+
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { PeopleApi } from '../affinity/people.js';

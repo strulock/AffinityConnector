@@ -1,3 +1,5 @@
+// MCP tools for searching and retrieving Affinity organizations (companies).
+
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { OrganizationsApi } from '../affinity/organizations.js';

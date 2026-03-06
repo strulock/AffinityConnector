@@ -1,3 +1,5 @@
+// Affinity v1 notes and interactions endpoints: /notes, /interactions
+
 import { AffinityClient } from './client.js';
 import { CACHE_TTL } from '../cache.js';
 import type { AffinityNote, AffinityInteraction } from './types.js';
@@ -5,6 +7,10 @@ import type { AffinityNote, AffinityInteraction } from './types.js';
 export class NotesApi {
   constructor(private client: AffinityClient) {}
 
+  /**
+   * Fetch notes, optionally filtered by person, organization, or opportunity.
+   * v1 returns a plain array — we wrap it in `{ notes }` for consistency.
+   */
   async getNotes(params: {
     person_id?: number;
     organization_id?: number;
@@ -27,6 +33,10 @@ export class NotesApi {
     return response;
   }
 
+  /**
+   * Create a plain-text note. `type: 0` is hardcoded — the Affinity v1 API only
+   * supports plain text notes via the API (rich text types are UI-only).
+   */
   async createNote(params: {
     content: string;
     person_ids?: number[];
@@ -42,6 +52,10 @@ export class NotesApi {
     });
   }
 
+  /**
+   * Fetch email and meeting interactions, optionally filtered by person or org.
+   * v1 returns a plain array — we wrap it in `{ interactions }` for consistency.
+   */
   async getInteractions(params: {
     person_id?: number;
     organization_id?: number;

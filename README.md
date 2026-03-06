@@ -125,7 +125,7 @@ wrangler deploy
 
 ### CI/CD (GitHub Actions)
 
-Every push to `main` automatically type-checks and deploys via `.github/workflows/deploy.yml`.
+Every push to `main` automatically type-checks, runs the test suite, and deploys via `.github/workflows/deploy.yml`.
 
 Required GitHub repository secrets:
 | Secret | Description |
@@ -144,7 +144,11 @@ AFFINITY_API_KEY=your_key_here
 Then run:
 
 ```bash
-npm run dev
+npm run dev          # start local Worker at http://localhost:8787/mcp
+npm run type-check   # TypeScript type check (no emit)
+npm run test         # run tests in watch mode
+npm run test:run     # run tests once
+npm run test:coverage  # run tests with coverage report (thresholds enforced)
 ```
 
 The server will be available at `http://localhost:8787/mcp`.
@@ -167,7 +171,7 @@ AFFINITY_V2_BASE_URL = "https://api.affinity.co/v2"
 
 [[kv_namespaces]]
 binding = "AFFINITY_CACHE"
-id = "<your-kv-namespace-id>"
+id = "1413d1000c9a4911acae52b3ce49aaa8"
 ```
 
 **Secrets** (set via `wrangler secret put`):

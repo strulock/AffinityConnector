@@ -50,14 +50,20 @@ export class AffinityClient {
     this.cache = new KVCache(options?.cache);
   }
 
+  /** Issue a GET request. Defaults to v1; pass `version: "v2"` for v2 endpoints. */
   async get<T>(path: string, params?: Record<string, unknown>, version: "v1" | "v2" = "v1"): Promise<T> {
     return this.apiRequest<T>("GET", path, undefined, params, version);
   }
 
+  /** Issue a POST request with a JSON body. Defaults to v1. */
   async post<T>(path: string, body: unknown, version: "v1" | "v2" = "v1"): Promise<T> {
     return this.apiRequest<T>("POST", path, body, undefined, version);
   }
 
+  /**
+   * Builds the full URL (selecting v1 or v2 base), appends non-null query params,
+   * attaches auth headers, and delegates to fetchWithRetry.
+   */
   private async apiRequest<T>(
     method: string,
     path: string,
@@ -69,6 +75,7 @@ export class AffinityClient {
     const url = new URL(baseUrl + path);
 
     if (params) {
+      // Skip null/undefined so callers can spread optional fields without filtering first.
       for (const [key, value] of Object.entries(params)) {
         if (value !== undefined && value !== null) {
           url.searchParams.set(key, String(value));

@@ -49,7 +49,7 @@ export interface AffinityOrganization {
 
 export interface AffinityList {
   id: number;
-  type: number;
+  type: number; // 0 = Person, 1 = Organization, 8 = Opportunity
   name: string;
   public: boolean;
   owner_id: number;
@@ -91,7 +91,7 @@ export interface AffinityField {
   id: number;
   name: string;
   list_id: number | null;
-  value_type: number;
+  value_type: number; // 0 = text, 1 = number, 2 = date, 3 = location, 4 = person, 5 = organization, 6 = dropdown
   allows_multiple: boolean;
   is_required: boolean;
   is_read_only: boolean;
@@ -114,7 +114,7 @@ export interface AffinityNote {
   opportunity_ids: number[];
   creator_id: number;
   content: string;
-  type: number;
+  type: number; // 0 = plain text (only supported type via API)
   is_deleted: boolean;
   created_at: string;
 }

@@ -1,3 +1,6 @@
+// Assembles the MCP server: instantiates all Affinity API classes and registers
+// all tool groups. Called once per Worker request with the API key from env.
+
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { AffinityClient, AffinityClientOptions } from "./affinity/client.js";
 import { PeopleApi } from "./affinity/people.js";
@@ -28,6 +31,7 @@ export function createServer(apiKey: string, options?: AffinityClientOptions): M
   registerOrganizationTools(server, orgsApi);
   registerListTools(server, listsApi);
   registerNotesTools(server, notesApi);
+  // Intelligence tools cross-reference people, orgs, and notes to build intro paths and summaries.
   registerIntelligenceTools(server, intelligenceApi, peopleApi, orgsApi, notesApi);
 
   return server;

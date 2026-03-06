@@ -122,6 +122,20 @@ User (Claude Desktop / claude.ai)
 - KV namespace `affinity-connector-cache` created in Cloudflare; binding added to `wrangler.toml`
 - `README.md`: full tool reference, claude.ai + Claude Desktop connection instructions, deployment guide
 
+### Phase 6 — Test Suite ✔ COMPLETE
+- Framework: **Vitest** with `@vitest/coverage-v8`; 126 tests across 14 test files
+- `test/helpers/kv-mock.ts`: in-memory `KVNamespace` mock; `test/helpers/mock-server.ts`: `McpServer` mock that captures and invokes tool handlers directly
+- Coverage by layer:
+  - `test/cache.test.ts` — `KVCache` (no-op, hit, miss, invalid JSON, TTL)
+  - `test/affinity/client.test.ts` — auth, URL building, v1/v2 routing, all error classes, 429 retry logic
+  - `test/affinity/*.test.ts` — all API classes with cache hit/miss, edge cases
+  - `test/tools/*.test.ts` — all 5 MCP tool modules (formatters, empty/populated results, edge cases)
+  - `test/server.test.ts` — `createServer` instantiation
+  - `test/index.test.ts` — Worker routing (OPTIONS, /health, /.well-known, /mcp, 404)
+- Coverage thresholds enforced (build fails if not met): 95% statements, 90% branches, 95% functions, 95% lines
+- Achieved: **98.8% statements, 90.4% branches, 97.1% functions, 99.7% lines**
+- CI pipeline updated: `type-check → test:coverage → deploy`
+
 ---
 
 ## Deployment

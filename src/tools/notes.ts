@@ -1,3 +1,5 @@
+// MCP tools for Affinity notes and interaction history (emails, meetings).
+
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { NotesApi } from '../affinity/notes.js';
@@ -21,7 +23,7 @@ function formatInteraction(interaction: AffinityInteraction): string {
   const type = INTERACTION_TYPE_LABELS[interaction.type] ?? `Type ${interaction.type}`;
   const date = new Date(interaction.date).toLocaleDateString();
   const subject = interaction.subject ? ` — "${interaction.subject}"` : '';
-  const snippet = interaction.body_text ? `\n  ${interaction.body_text.slice(0, 200)}` : '';
+  const snippet = interaction.body_text ? `\n  ${interaction.body_text.slice(0, 200)}` : ''; // truncate long bodies
   return `[${type}] ${date}${subject}${snippet}`;
 }
 
