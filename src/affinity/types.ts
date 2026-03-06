@@ -137,6 +137,18 @@ export interface AffinityRelationshipStrength {
   last_activity_date: string | null;
 }
 
+export interface AffinityReminder {
+  id: number;
+  content: string;
+  due_date: string;
+  person_ids: number[];
+  organization_ids: number[];
+  opportunity_ids: number[];
+  creator_id: number;
+  completed_at: string | null;
+  created_at: string;
+}
+
 export interface AffinitySavedView {
   id: number;
   list_id: number;

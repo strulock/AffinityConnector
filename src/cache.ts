@@ -31,4 +31,5 @@ export const CACHE_TTL = {
   interactions: 120,  // interactions — 2 min
   strength: 300,      // relationship strength — 5 min
   fields: 600,        // field definitions — 10 min (schema changes infrequently)
+  reminders: 120,     // reminders — 2 min (time-sensitive follow-ups)
 } as const;
