@@ -136,6 +136,151 @@ User (Claude Desktop / claude.ai)
 - Achieved: **98.8% statements, 90.4% branches, 97.1% functions, 99.7% lines**
 - CI pipeline updated: `type-check → test:coverage → deploy`
 
+### Phase 7 — Field Intelligence (Read)
+
+Prerequisite for all write phases: expose field metadata so Claude can discover field names and IDs before attempting to read or write values.
+
+**New API classes:**
+- `src/affinity/fields.ts`: `FieldsApi` with `getFields`, `getPersonFields`, `getOrganizationFields`, `getListFields`, `getFieldValueChanges` (v1)
+
+**New MCP tools (`src/tools/fields.ts`):**
+- `get_field_definitions` — list all custom field definitions (global + list-specific), with name, type, and allowed values; accepts optional `list_id` filter
+- `get_list_fields` — fields available on a specific list (v1 `/fields?list_id=` or v2 `GET /v2/lists/{id}/fields`)
+- `get_field_value_changes` — audit trail of changes to a field value over time; accepts `field_id` and optional `entity_id`/`list_entry_id`
+
+**New types:** `AffinityFieldDefinition`, `AffinityFieldValueChange`
+
+---
+
+### Phase 8 — Write: Field Values
+
+The most impactful write operation — update pipeline stages, deal amounts, and any custom field on a record.
+
+**Extends `src/affinity/lists.ts`:** add `setFieldValue` (v1 `POST /field-values` for new, `PUT /field-values/{id}` for update), `deleteFieldValue` (v1 `DELETE /field-values/{id}`)
+
+**Alternative v2 path (preferred when available):** `POST /v2/lists/{listId}/list-entries/{entryId}/fields/{fieldId}` for single-field update; `PATCH /v2/lists/{listId}/list-entries/{entryId}/fields` for batch update.
+
+**New MCP tools (extend `src/tools/lists.ts`):**
+- `set_field_value` — create or update a single field value on a list entry; accepts `list_entry_id`, `field_id`, `value`; uses v2 batch endpoint when `list_id` is provided, falls back to v1
+- `delete_field_value` — delete a field value by `field_value_id`
+
+**Validation note:** call `get_field_definitions` or cache field metadata to validate `value` type before writing.
+
+**New tests:** cover create vs. update path selection, v1/v2 routing, invalid value rejection.
+
+---
+
+### Phase 9 — Opportunities
+
+Dedicated opportunity tools to complement list entries. Currently opportunities are only visible as `entity_type: 8` rows inside `get_list_entries`.
+
+**New API class:**
+- `src/affinity/opportunities.ts`: `OpportunitiesApi` with `search`, `getById`, `create`, `update` (all v1)
+
+**New MCP tools (`src/tools/opportunities.ts`):**
+- `search_opportunities` — search/list opportunities by name; accepts optional `list_id` to scope results
+- `get_opportunity` — full opportunity detail by ID (name, person IDs, org IDs, list entries, field values)
+- `create_opportunity` — create a new opportunity; accepts `name`, `person_ids`, `organization_ids`, optional `list_id` to add it to a list immediately
+- `update_opportunity` — update name or associated people/orgs on an existing opportunity
+
+**New types:** extend `AffinityOpportunity` with `name`, `notes`, any additional v1 fields.
+
+**Cache:** opportunity profiles at 5 min TTL; invalidate on `create`/`update`.
+
+---
+
+### Phase 10 — Write: People & Organizations
+
+Create and update the core CRM entities. Most useful for "add this person I just met" and "update the company domain" workflows.
+
+**Extends `src/affinity/people.ts`:** add `create`, `update`, `delete` (v1 `POST/PUT/DELETE /persons`)
+**Extends `src/affinity/organizations.ts`:** add `create`, `update`, `delete` (v1 `POST/PUT/DELETE /organizations`)
+
+**New MCP tools (extend `src/tools/people.ts` and `src/tools/organizations.ts`):**
+- `create_person` — create a new contact; accepts `first_name`, `last_name`, `emails`, optional `organization_ids`, `phone_numbers`
+- `update_person` — update name, emails, or org associations on an existing person by ID
+- `create_organization` — create a new company; accepts `name`, `domain`, optional `person_ids`
+- `update_organization` — update name or domain on an existing org by ID
+
+**Design note:** skip `delete_person` / `delete_organization` MCP tools for now — destructive, hard to reverse, low AI-assistant use case. Can be added later if needed.
+
+**Cache invalidation:** bust `people:{id}` and `orgs:{id}` cache keys on successful write.
+
+---
+
+### Phase 11 — List Management & Saved Views
+
+Add entries to lists (add a deal to the pipeline), remove them, and query lists through their saved views.
+
+**Extends `src/affinity/lists.ts`:** add `addListEntry` (v1 `POST /lists/{id}/list-entries`), `removeListEntry` (v1 `DELETE /lists/{id}/list-entries/{entry_id}`), `getSavedViews` (v2 `GET /v2/lists/{id}/saved-views`), `getSavedViewEntries` (v2 `GET /v2/lists/{id}/saved-views/{viewId}/list-entries`)
+
+**New MCP tools (extend `src/tools/lists.ts`):**
+- `add_to_list` — add a person, org, or opportunity to a list by entity ID + entity type
+- `remove_from_list` — remove a list entry by `list_entry_id`
+- `get_saved_views` — list the saved views defined for a given list (view name, ID, creator)
+- `get_saved_view_entries` — fetch list entries through a named saved view (respects that view's filters, sort order, and visible columns); accepts `list_id` + `view_id` or `view_name`
+
+**New types:** `AffinitySavedView`
+
+---
+
+### Phase 12 — Reminders
+
+Surface Affinity's task/reminder system so Claude can schedule follow-ups directly from conversation.
+
+**New API class:**
+- `src/affinity/reminders.ts`: `RemindersApi` with `getReminders`, `createReminder`, `updateReminder`, `deleteReminder` (all v1)
+
+**New MCP tools (`src/tools/reminders.ts`):**
+- `get_reminders` — list upcoming reminders; accepts optional `person_id` or `organization_id` filter
+- `create_reminder` — create a follow-up reminder; accepts `content`, `due_date`, and at least one of `person_id`/`organization_id`/`opportunity_id`
+- `update_reminder` — reschedule or update reminder content
+- `delete_reminder` — delete a reminder by ID (after it's been acted on)
+
+**New types:** `AffinityReminder`
+
+---
+
+### Phase 13 — v2 Rich Interactions & Note Threads
+
+Replace / supplement the v1 `/interactions` catch-all with v2's granular per-type endpoints, and add note reply thread support.
+
+**New API class:**
+- `src/affinity/interactions_v2.ts`: `InteractionsV2Api` with `getEmails`, `getCalls`, `getMeetings`, `getChatMessages` (all v2); each supports filtering by `id`, timestamp range (`sentAt`/`startTime`/`createdAt`), and pagination
+
+**Extends `src/affinity/notes.ts`:** add `getNoteReplies` (v2 `GET /v2/notes/{id}/replies`), `updateNote` (v1 `PUT /notes/{id}`), `deleteNote` (v1 `DELETE /notes/{id}`)
+
+**New MCP tools (`src/tools/interactions_v2.ts`):**
+- `get_emails` — email history with date-range filtering
+- `get_calls` — call history (v2-only; no v1 equivalent)
+- `get_meetings` — meeting history with richer metadata than v1
+- `get_chat_messages` — Slack/chat message history (v2-only)
+
+**Extend `src/tools/notes.ts`:**
+- `get_note_replies` — fetch reply thread for a note by `note_id`
+- `update_note` — update note content by ID
+- `delete_note` — delete a note by ID
+
+---
+
+### Phase 14 — Advanced Features & Beta
+
+**Semantic Search (v2 BETA):**
+- `src/affinity/semantic_search.ts`: `SemanticSearchApi` with `search` (v2 `POST /v2/semantic-search`)
+- MCP tool `semantic_search` — natural-language company search; accepts a free-text `query`, returns ranked company matches; clearly label as beta in tool description
+
+**Transcripts (v2 BETA):**
+- `src/affinity/transcripts.ts`: `TranscriptsApi` with `getTranscripts`, `getTranscript`, `getTranscriptFragments` (v2)
+- MCP tools `get_transcripts`, `get_transcript` — list and read call/meeting transcripts with fragment-level access
+
+**Deduplication (v2):**
+- Extend `src/affinity/people.ts` / `organizations.ts`: `mergePeople` (v2 `POST /v2/person-merges`), `mergeCompanies` (v2 `POST /v2/company-merges`)
+- MCP tools `merge_persons`, `merge_companies` — requires confirmation guard in the tool description; polls the async merge task status before returning
+
+**Utility:**
+- `get_whoami` — identify the authenticated user (v1 `GET /whoami` or v2 `GET /v2/auth/whoami`); useful for "who is the current API user?" and onboarding
+- `get_rate_limit` — return remaining monthly and per-minute quota (v1 `GET /rate-limit`)
+
 ---
 
 ## Deployment
