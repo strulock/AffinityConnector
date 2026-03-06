@@ -129,3 +129,10 @@ export interface AffinityInteraction {
   organization_ids: number[];
   creator_ids: number[];
 }
+
+export interface AffinityRelationshipStrength {
+  entity_id: number;
+  entity_type: number; // 0 = person, 1 = org
+  strength: number; // 0–100
+  last_activity_date: string | null;
+}
