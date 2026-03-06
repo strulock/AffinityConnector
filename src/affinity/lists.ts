@@ -57,4 +57,29 @@ export class ListsApi {
     await this.client.cache.set(cacheKey, values, CACHE_TTL.listEntries);
     return values;
   }
+
+  /**
+   * Create or update a field value on a list entry (v1).
+   * - Provide `field_value_id` to update an existing value (PUT /field-values/{id}).
+   * - Omit `field_value_id` to create a new value (POST /field-values).
+   */
+  async setFieldValue(params: {
+    field_id: number;
+    entity_id: number;
+    entity_type: number;
+    list_entry_id: number;
+    value: unknown;
+    field_value_id?: number;
+  }): Promise<AffinityFieldValue> {
+    const { field_value_id, ...createBody } = params;
+    if (field_value_id != null) {
+      return this.client.put<AffinityFieldValue>(`/field-values/${field_value_id}`, { value: params.value });
+    }
+    return this.client.post<AffinityFieldValue>('/field-values', createBody);
+  }
+
+  /** Delete a field value by its ID (v1 DELETE /field-values/{id}). */
+  async deleteFieldValue(fieldValueId: number): Promise<void> {
+    await this.client.del<{ success: boolean }>(`/field-values/${fieldValueId}`);
+  }
 }

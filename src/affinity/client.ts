@@ -60,6 +60,16 @@ export class AffinityClient {
     return this.apiRequest<T>("POST", path, body, undefined, version);
   }
 
+  /** Issue a PUT request with a JSON body. Defaults to v1. */
+  async put<T>(path: string, body: unknown, version: "v1" | "v2" = "v1"): Promise<T> {
+    return this.apiRequest<T>("PUT", path, body, undefined, version);
+  }
+
+  /** Issue a DELETE request. Defaults to v1. */
+  async del<T>(path: string, version: "v1" | "v2" = "v1"): Promise<T> {
+    return this.apiRequest<T>("DELETE", path, undefined, undefined, version);
+  }
+
   /**
    * Builds the full URL (selecting v1 or v2 base), appends non-null query params,
    * attaches auth headers, and delegates to fetchWithRetry.
@@ -98,7 +108,10 @@ export class AffinityClient {
   private async fetchWithRetry<T>(url: string, init: RequestInit, attempt = 0): Promise<T> {
     const response = await fetch(url, init);
 
-    if (response.ok) return response.json() as Promise<T>;
+    if (response.ok) {
+      if (response.status === 204) return undefined as unknown as T;
+      return response.json() as Promise<T>;
+    }
 
     const status = response.status;
     let message: string;

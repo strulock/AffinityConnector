@@ -153,3 +153,57 @@ describe('get_field_values tool', () => {
     expect(result.content[0].text).toContain('No field values found');
   });
 });
+
+describe('set_field_value tool', () => {
+  const CREATED_VALUE = { id: 300, field_id: 5, entity_type: 1, entity_id: 10, list_entry_id: 101, value: 'Series B' };
+
+  it('returns Created confirmation when creating a new value', async () => {
+    const mockApi = {
+      getLists: vi.fn(), getListEntries: vi.fn(), getFieldValues: vi.fn(),
+      setFieldValue: vi.fn().mockResolvedValue(CREATED_VALUE),
+      deleteFieldValue: vi.fn(),
+    };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('set_field_value', { field_id: 5, value: 'Series B', list_entry_id: 101, entity_id: 10, entity_type: 1 });
+    expect(mockApi.setFieldValue).toHaveBeenCalledWith(expect.objectContaining({ field_id: 5, value: 'Series B', list_entry_id: 101, entity_id: 10, entity_type: 1 }));
+    expect(result.content[0].text).toContain('Created');
+    expect(result.content[0].text).toContain('300');
+  });
+
+  it('returns Updated confirmation when field_value_id is provided', async () => {
+    const mockApi = {
+      getLists: vi.fn(), getListEntries: vi.fn(), getFieldValues: vi.fn(),
+      setFieldValue: vi.fn().mockResolvedValue({ ...CREATED_VALUE, id: 200 }),
+      deleteFieldValue: vi.fn(),
+    };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('set_field_value', { field_id: 5, value: 'Series B', field_value_id: 200 });
+    expect(mockApi.setFieldValue).toHaveBeenCalledWith(expect.objectContaining({ field_value_id: 200, value: 'Series B' }));
+    expect(result.content[0].text).toContain('Updated');
+    expect(result.content[0].text).toContain('200');
+  });
+
+  it('returns validation error when creating without required params', async () => {
+    const { callTool } = setup([]);
+    const result = await callTool('set_field_value', { field_id: 5, value: 'x' });
+    expect(result.content[0].text).toContain('list_entry_id, entity_id, and entity_type are required');
+  });
+});
+
+describe('delete_field_value tool', () => {
+  it('returns success message after deletion', async () => {
+    const mockApi = {
+      getLists: vi.fn(), getListEntries: vi.fn(), getFieldValues: vi.fn(),
+      setFieldValue: vi.fn(),
+      deleteFieldValue: vi.fn().mockResolvedValue(undefined),
+    };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('delete_field_value', { field_value_id: 200 });
+    expect(mockApi.deleteFieldValue).toHaveBeenCalledWith(200);
+    expect(result.content[0].text).toContain('200');
+    expect(result.content[0].text).toContain('deleted successfully');
+  });
+});

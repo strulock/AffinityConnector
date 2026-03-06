@@ -129,3 +129,62 @@ describe('ListsApi.getFieldValues', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('ListsApi.setFieldValue', () => {
+  it('POSTs to /field-values when no field_value_id is provided (create)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(MOCK_FIELD_VALUE), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new ListsApi(new AffinityClient('key'));
+    const result = await api.setFieldValue({ field_id: 5, entity_id: 10, entity_type: 1, list_entry_id: 100, value: 'Series B' });
+    expect(result).toEqual(MOCK_FIELD_VALUE);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/field-values');
+    expect(url).not.toContain('/field-values/');
+    expect((init as RequestInit).method).toBe('POST');
+  });
+
+  it('PUTs to /field-values/{id} when field_value_id is provided (update)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(MOCK_FIELD_VALUE), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new ListsApi(new AffinityClient('key'));
+    await api.setFieldValue({ field_id: 5, entity_id: 10, entity_type: 1, list_entry_id: 100, value: 'Series B', field_value_id: 200 });
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/field-values/200');
+    expect((init as RequestInit).method).toBe('PUT');
+  });
+
+  it('sends only { value } in the body for an update', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(MOCK_FIELD_VALUE), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new ListsApi(new AffinityClient('key'));
+    await api.setFieldValue({ field_id: 5, entity_id: 10, entity_type: 1, list_entry_id: 100, value: 'Series B', field_value_id: 200 });
+    const body = JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string);
+    expect(body).toEqual({ value: 'Series B' });
+  });
+});
+
+describe('ListsApi.deleteFieldValue', () => {
+  it('sends DELETE to /field-values/{id}', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ success: true }), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new ListsApi(new AffinityClient('key'));
+    await api.deleteFieldValue(200);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(url).toContain('/field-values/200');
+    expect((init as RequestInit).method).toBe('DELETE');
+  });
+
+  it('handles 204 No Content response without throwing', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status: 204 })));
+    const api = new ListsApi(new AffinityClient('key'));
+    await expect(api.deleteFieldValue(200)).resolves.toBeUndefined();
+  });
+});

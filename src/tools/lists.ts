@@ -117,4 +117,68 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
       };
     }
   );
+
+  server.tool(
+    'set_field_value',
+    'Create or update a custom field value on an Affinity list entry. If field_value_id is provided the existing value is updated (PUT); otherwise a new value is created (POST). Call get_field_definitions first to find field IDs and types, and get_field_values to find existing field_value_ids.',
+    {
+      field_id: z.number().int().describe('Field ID (from get_field_definitions)'),
+      value: z
+        .union([z.string(), z.number(), z.boolean(), z.null()])
+        .describe('New value for the field. Use a string for text/date/dropdown, number for numeric fields, null to clear.'),
+      field_value_id: z
+        .number().int().optional()
+        .describe('Existing field value ID to update (from get_field_values). If omitted, a new value is created.'),
+      list_entry_id: z
+        .number().int().optional()
+        .describe('List entry ID — required when creating a new value.'),
+      entity_id: z
+        .number().int().optional()
+        .describe('Entity ID of the person, org, or opportunity — required when creating a new value.'),
+      entity_type: z
+        .number().int().optional()
+        .describe('Entity type — required when creating: 0 = person, 1 = organization, 8 = opportunity.'),
+    },
+    async ({ field_id, value, field_value_id, list_entry_id, entity_id, entity_type }) => {
+      if (field_value_id == null && (list_entry_id == null || entity_id == null || entity_type == null)) {
+        return {
+          content: [{
+            type: 'text',
+            text: 'list_entry_id, entity_id, and entity_type are required when creating a new field value (no field_value_id provided).',
+          }],
+        };
+      }
+
+      const result = await api.setFieldValue({
+        field_id,
+        entity_id: entity_id ?? 0,
+        entity_type: entity_type ?? 0,
+        list_entry_id: list_entry_id ?? 0,
+        value,
+        field_value_id,
+      });
+
+      const action = field_value_id != null ? 'Updated' : 'Created';
+      return {
+        content: [{
+          type: 'text',
+          text: `${action} field value [id:${result.id}] — field ${result.field_id} on list entry ${result.list_entry_id ?? list_entry_id}.`,
+        }],
+      };
+    }
+  );
+
+  server.tool(
+    'delete_field_value',
+    'Delete a custom field value from an Affinity list entry by its field value ID. Use get_field_values to find field value IDs.',
+    {
+      field_value_id: z.number().int().describe('Field value ID to delete (from get_field_values results)'),
+    },
+    async ({ field_value_id }) => {
+      await api.deleteFieldValue(field_value_id);
+      return {
+        content: [{ type: 'text', text: `Field value ${field_value_id} deleted successfully.` }],
+      };
+    }
+  );
 }
