@@ -123,7 +123,7 @@ User (Claude Desktop / claude.ai)
 - `README.md`: full tool reference, claude.ai + Claude Desktop connection instructions, deployment guide
 
 ### Phase 6 — Test Suite ✔ COMPLETE
-- Framework: **Vitest** with `@vitest/coverage-v8`; 126 tests across 14 test files (157 tests as of Phase 7)
+- Framework: **Vitest** with `@vitest/coverage-v8`; 126 tests across 14 test files (166 tests as of Phase 8)
 - `test/helpers/kv-mock.ts`: in-memory `KVNamespace` mock; `test/helpers/mock-server.ts`: `McpServer` mock that captures and invokes tool handlers directly
 - Coverage by layer:
   - `test/cache.test.ts` — `KVCache` (no-op, hit, miss, invalid JSON, TTL)
