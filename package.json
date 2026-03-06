@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest",
+    "test:run": "vitest run"
   },
   "license": "GPL-3.0",
   "dependencies": {
@@ -15,6 +17,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260305.1",
     "typescript": "^5.7.0",
+    "vitest": "^4.0.18",
     "wrangler": "^4.70.0"
   }
 }
