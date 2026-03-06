@@ -170,13 +170,13 @@ User (Claude Desktop / claude.ai)
 - `README.md`: full tool reference, claude.ai + Claude Desktop connection instructions, deployment guide
 
 ### Phase 6 — Test Suite ✔ COMPLETE
-- Framework: **Vitest** with `@vitest/coverage-v8`; 126 tests across 14 test files (308 tests as of Phase 14)
+- Framework: **Vitest** with `@vitest/coverage-v8`; 126 tests across 14 test files at Phase 6 (308 tests across 30 test files as of Phase 14)
 - `test/helpers/kv-mock.ts`: in-memory `KVNamespace` mock; `test/helpers/mock-server.ts`: `McpServer` mock that captures and invokes tool handlers directly
 - Coverage by layer:
   - `test/cache.test.ts` — `KVCache` (no-op, hit, miss, invalid JSON, TTL)
   - `test/affinity/client.test.ts` — auth, URL building, v1/v2 routing, all error classes, 429 retry logic
-  - `test/affinity/*.test.ts` — all API classes with cache hit/miss, edge cases
-  - `test/tools/*.test.ts` — all 5 MCP tool modules (formatters, empty/populated results, edge cases)
+  - `test/affinity/*.test.ts` — all API classes with cache hit/miss, edge cases (13 files)
+  - `test/tools/*.test.ts` — all 13 MCP tool modules (formatters, empty/populated results, edge cases)
   - `test/server.test.ts` — `createServer` instantiation
   - `test/index.test.ts` — Worker routing (OPTIONS, /health, /.well-known, /mcp, 404)
 - Coverage thresholds enforced (build fails if not met): 95% statements, 90% branches, 95% functions, 95% lines
@@ -318,7 +318,7 @@ User (Claude Desktop / claude.ai)
 
 ### CI/CD: GitHub Actions
 - Workflow at `.github/workflows/deploy.yml` triggers on every push to `main`
-- Steps: checkout → `npm ci` → type-check → `wrangler deploy` → `wrangler secret put AFFINITY_API_KEY`
+- Steps: checkout → `npm ci` → type-check → `test:coverage` → `wrangler deploy` → `wrangler secret put AFFINITY_API_KEY`
 - Requires two GitHub repo secrets: `CLOUDFLARE_API_TOKEN` and `AFFINITY_API_KEY`
 
 ### Configuration (`wrangler.toml`)
@@ -348,12 +348,19 @@ Use whichever version exposes the richer or more reliable data for each domain:
 
 | Domain | Preferred Version | Notes |
 |--------|------------------|-------|
-| People | v2 | Richer field structure, pagination |
-| Organizations | v2 | Richer field structure, pagination |
-| Lists & entries | v1 | v2 list support is limited |
-| Notes | v1 | Only version available |
-| Interactions | v1 | Only version available |
+| People | v1 | create/update/search/getById all v1 |
+| Organizations | v1 | create/update/search/getById all v1 |
+| Lists & entries | v1 | v2 list support is limited; saved views use v2 |
+| Field values | v1 (create/update), v2 (batch) | batch_set_field_values uses v2 |
+| Notes | v1 (CRUD), v2 (replies) | getNoteReplies is v2; update/delete are v1 |
+| Interactions (legacy) | v1 | /interactions — email + meeting combined |
+| Interactions (per-channel) | v2 | /emails, /calls, /meetings, /chat-messages |
 | Relationship intelligence | v1 | Strength scores, intro paths |
+| Reminders | v1 | Full CRUD |
+| Transcripts | v2 (BETA) | List, read, fragments |
+| Semantic search | v2 (BETA) | Companies only |
+| Merges (dedup) | v2 | Async tasks for person + company merges |
+| Current user / rate limit | v2 / v1 | getCurrentUser = v2, getRateLimit = v1 |
 
 - **v1 base URL**: `https://api.affinity.co/...`
 - **v2 base URL**: `https://api.affinity.co/v2/...`
