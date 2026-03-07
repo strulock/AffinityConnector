@@ -17,6 +17,11 @@ export class AffinityNotFoundError extends Error {
   constructor(message: string) { super(message); this.name = "AffinityNotFoundError"; }
 }
 
+export class AffinityConflictError extends Error {
+  readonly status = 409;
+  constructor(message: string) { super(message); this.name = "AffinityConflictError"; }
+}
+
 export class AffinityRateLimitError extends Error {
   readonly status = 429;
   constructor(message: string) { super(message); this.name = "AffinityRateLimitError"; }
@@ -125,6 +130,7 @@ export class AffinityClient {
     if (status === 401) throw new AffinityAuthError(message);
     if (status === 403) throw new AffinityPermissionError(message);
     if (status === 404) throw new AffinityNotFoundError(message);
+    if (status === 409) throw new AffinityConflictError(message);
 
     if (status === 429) {
       if (attempt < 3) {

@@ -137,6 +137,31 @@ describe('PeopleApi.create', () => {
     expect(body.emails).toEqual(['alice@example.com']);
     expect(body.organization_ids).toEqual([10]);
   });
+
+  it('invalidates search cache after creating a person', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(MOCK_PERSON), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const cache = makeKVMock();
+    const client = new AffinityClient('key', { cache });
+    const api = new PeopleApi(client);
+    // Prime search cache
+    await api.search('Alice');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // Create new person — should invalidate search cache
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(MOCK_PERSON), { status: 200 })
+    ));
+    await api.create({ first_name: 'Alice', last_name: 'Jones' });
+    // Next search must hit the API again
+    const fetchMock2 = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ persons: [MOCK_PERSON] }), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock2);
+    await api.search('Alice');
+    expect(fetchMock2).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('PeopleApi.update', () => {
@@ -168,5 +193,29 @@ describe('PeopleApi.update', () => {
     const cached = await api.getById(1);
     expect(cached.first_name).toBe('Alicia');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('invalidates search cache after updating a person', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ persons: [MOCK_PERSON] }), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const cache = makeKVMock();
+    const api = new PeopleApi(new AffinityClient('key', { cache }));
+    // Prime search cache
+    await api.search('Alice');
+    // Update should invalidate search cache
+    const updated = { ...MOCK_PERSON, first_name: 'Alicia' };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(updated), { status: 200 })
+    ));
+    await api.update(1, { first_name: 'Alicia' });
+    // Next search must hit the API again
+    const fetchMock2 = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ persons: [updated] }), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock2);
+    await api.search('Alice');
+    expect(fetchMock2).toHaveBeenCalledTimes(1);
   });
 });

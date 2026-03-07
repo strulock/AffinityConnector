@@ -29,6 +29,10 @@ import { MergesApi } from "./affinity/merges.js";
 import { registerMergeTools } from "./tools/merges.js";
 import { UtilityApi } from "./affinity/utility.js";
 import { registerUtilityTools } from "./tools/utility.js";
+import { WebhooksApi } from "./affinity/webhooks.js";
+import { registerWebhookTools } from "./tools/webhooks.js";
+import { registerSearchAllTool } from "./tools/search_all.js";
+import { registerActivityTimelineTool } from "./tools/activity_timeline.js";
 
 export function createServer(apiKey: string, options?: AffinityClientOptions): McpServer {
   const client = new AffinityClient(apiKey, options);
@@ -45,6 +49,7 @@ export function createServer(apiKey: string, options?: AffinityClientOptions): M
   const transcriptsApi = new TranscriptsApi(client);
   const mergesApi = new MergesApi(client);
   const utilityApi = new UtilityApi(client);
+  const webhooksApi = new WebhooksApi(client);
 
   const server = new McpServer({
     name: "affinity-connector",
@@ -56,7 +61,7 @@ export function createServer(apiKey: string, options?: AffinityClientOptions): M
   registerListTools(server, listsApi);
   registerNotesTools(server, notesApi);
   // Intelligence tools cross-reference people, orgs, and notes to build intro paths and summaries.
-  registerIntelligenceTools(server, intelligenceApi, peopleApi, orgsApi, notesApi);
+  registerIntelligenceTools(server, intelligenceApi, peopleApi, orgsApi, notesApi, interactionsV2Api);
   registerFieldTools(server, fieldsApi);
   registerOpportunityTools(server, opportunitiesApi);
   registerReminderTools(server, remindersApi);
@@ -65,6 +70,9 @@ export function createServer(apiKey: string, options?: AffinityClientOptions): M
   registerTranscriptTools(server, transcriptsApi);
   registerMergeTools(server, mergesApi);
   registerUtilityTools(server, utilityApi);
+  registerWebhookTools(server, webhooksApi, client.cache, peopleApi, orgsApi);
+  registerSearchAllTool(server, peopleApi, orgsApi, opportunitiesApi);
+  registerActivityTimelineTool(server, interactionsV2Api, notesApi);
 
   return server;
 }

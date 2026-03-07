@@ -40,6 +40,18 @@ describe('SemanticSearchApi.search', () => {
     expect((await api.search('test')).results).toEqual([]);
   });
 
+  it('includes page_token in POST body when provided', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new SemanticSearchApi(new AffinityClient('key'));
+    await api.search('fintech', { page_token: 'tok-ss' });
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.page_token).toBe('tok-ss');
+  });
+
   it('POSTs to /v2/search with entity_types and query', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))

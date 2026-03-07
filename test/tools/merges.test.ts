@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { MergesApi } from '../../src/affinity/merges.js';
+import { AffinityNotFoundError } from '../../src/affinity/client.js';
 import { registerMergeTools } from '../../src/tools/merges.js';
 import { makeMockServer } from '../helpers/mock-server.js';
 import type { AffinityMergeTask } from '../../src/affinity/types.js';
@@ -63,7 +64,36 @@ describe('merge_persons tool', () => {
     expect(result.content[0].text).toContain('completed');
     vi.useRealTimers();
   });
-});
+
+  it('returns "initiated" message when polling exhausts all attempts without completion', async () => {
+    const mockApi = {
+      ...BASE_API(),
+      mergePersons: vi.fn().mockResolvedValue(PENDING_TASK),
+      getMergeTaskStatus: vi.fn().mockResolvedValue(PENDING_TASK),
+    } as unknown as MergesApi;
+    vi.useFakeTimers();
+    const { server, callTool } = makeMockServer();
+    registerMergeTools(server, mockApi);
+    const resultPromise = callTool('merge_persons', { base_person_id: 1, to_merge_person_id: 2 });
+    await vi.runAllTimersAsync();
+    const result = await resultPromise;
+    // 5 loop iterations + 1 final call = 6 getMergeTaskStatus calls
+    expect(mockApi.getMergeTaskStatus).toHaveBeenCalledTimes(6);
+    expect(result.content[0].text).toContain('task-3');
+    expect(result.content[0].text).toContain('pending');
+    vi.useRealTimers();
+  });
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
+    const mockApi = {
+      ...BASE_API(),
+      mergePersons: vi.fn().mockRejectedValue(new AffinityNotFoundError('person 999 not found')),
+    } as unknown as MergesApi;
+    const { server, callTool } = makeMockServer();
+    registerMergeTools(server, mockApi);
+    const result = await callTool('merge_persons', { base_person_id: 999, to_merge_person_id: 200 });
+    expect(result.content[0].text).toContain('Not found:');
+  });
+}); // end merge_persons
 
 describe('merge_companies tool', () => {
   it('returns success message when merge completes immediately', async () => {
@@ -77,5 +107,33 @@ describe('merge_companies tool', () => {
     const text = result.content[0].text;
     expect(text).toContain('completed');
     expect(text).toContain('task-1');
+  });
+
+  it('polls getMergeTaskStatus when merge_companies initial status is pending', async () => {
+    const mockApi = {
+      ...BASE_API(),
+      mergeCompanies: vi.fn().mockResolvedValue(PENDING_TASK),
+      getMergeTaskStatus: vi.fn().mockResolvedValue(COMPLETED_TASK),
+    } as unknown as MergesApi;
+    vi.useFakeTimers();
+    const { server, callTool } = makeMockServer();
+    registerMergeTools(server, mockApi);
+    const resultPromise = callTool('merge_companies', { base_company_id: 300, to_merge_company_id: 400 });
+    await vi.runAllTimersAsync();
+    const result = await resultPromise;
+    expect(mockApi.getMergeTaskStatus).toHaveBeenCalledWith('task-3', 'company');
+    expect(result.content[0].text).toContain('completed');
+    vi.useRealTimers();
+  });
+
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
+    const mockApi = {
+      ...BASE_API(),
+      mergeCompanies: vi.fn().mockRejectedValue(new AffinityNotFoundError('company 999 not found')),
+    } as unknown as MergesApi;
+    const { server, callTool } = makeMockServer();
+    registerMergeTools(server, mockApi);
+    const result = await callTool('merge_companies', { base_company_id: 999, to_merge_company_id: 400 });
+    expect(result.content[0].text).toContain('Not found:');
   });
 });

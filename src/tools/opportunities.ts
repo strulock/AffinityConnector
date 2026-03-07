@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { OpportunitiesApi } from '../affinity/opportunities.js';
+import { toolError } from './_error.js';
 import type { AffinityOpportunity } from '../affinity/types.js';
 
 function formatOpportunity(opp: AffinityOpportunity): string {
@@ -43,6 +44,7 @@ export function registerOpportunityTools(server: McpServer, api: OpportunitiesAp
       opportunity_id: z.number().int().describe('Opportunity ID (from search_opportunities or get_list_entries)'),
     },
     async ({ opportunity_id }) => {
+      try {
       const opp = await api.getById(opportunity_id);
       if (!opp) {
         return { content: [{ type: 'text', text: `Opportunity ${opportunity_id} not found.` }] };
@@ -59,6 +61,7 @@ export function registerOpportunityTools(server: McpServer, api: OpportunitiesAp
         `Created: ${new Date(opp.created_at).toLocaleDateString()}`,
       ];
       return { content: [{ type: 'text', text: lines.join('\n') }] };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -71,13 +74,15 @@ export function registerOpportunityTools(server: McpServer, api: OpportunitiesAp
       organization_ids: z.array(z.number().int()).optional().describe('Organization IDs to associate with this opportunity'),
     },
     async ({ name, person_ids, organization_ids }) => {
-      const opp = await api.create({ name, person_ids, organization_ids });
-      return {
-        content: [{
-          type: 'text',
-          text: `Created opportunity [id:${opp.id}] "${opp.name}". Use add_to_list to add it to a pipeline.`,
-        }],
-      };
+      try {
+        const opp = await api.create({ name, person_ids, organization_ids });
+        return {
+          content: [{
+            type: 'text',
+            text: `Created opportunity [id:${opp.id}] "${opp.name}". Use add_to_list to add it to a pipeline.`,
+          }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -96,10 +101,12 @@ export function registerOpportunityTools(server: McpServer, api: OpportunitiesAp
           content: [{ type: 'text', text: 'Provide at least one of name, person_ids, or organization_ids to update.' }],
         };
       }
-      const opp = await api.update(opportunity_id, { name, person_ids, organization_ids });
-      return {
-        content: [{ type: 'text', text: `Updated opportunity [id:${opp.id}] "${opp.name}".` }],
-      };
+      try {
+        const opp = await api.update(opportunity_id, { name, person_ids, organization_ids });
+        return {
+          content: [{ type: 'text', text: `Updated opportunity [id:${opp.id}] "${opp.name}".` }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 }

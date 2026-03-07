@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { PeopleApi } from '../affinity/people.js';
+import { toolError } from './_error.js';
 import type { AffinityPerson } from '../affinity/types.js';
 
 function formatPerson(p: AffinityPerson): string {
@@ -47,6 +48,7 @@ export function registerPeopleTools(server: McpServer, api: PeopleApi): void {
       person_id: z.number().int().describe('Affinity person ID'),
     },
     async ({ person_id }) => {
+      try {
       const person = await api.getById(person_id);
       const name = [person.first_name, person.last_name].filter(Boolean).join(' ');
       const emails = person.emails.join(', ') || 'none';
@@ -68,6 +70,7 @@ export function registerPeopleTools(server: McpServer, api: PeopleApi): void {
       ].join('\n');
 
       return { content: [{ type: 'text', text }] };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -82,11 +85,13 @@ export function registerPeopleTools(server: McpServer, api: PeopleApi): void {
       phone_numbers: z.array(z.string()).optional().describe('Phone numbers'),
     },
     async ({ first_name, last_name, emails, organization_ids, phone_numbers }) => {
-      const person = await api.create({ first_name, last_name, emails, organization_ids, phone_numbers });
-      const name = [person.first_name, person.last_name].filter(Boolean).join(' ');
-      return {
-        content: [{ type: 'text', text: `Created person [id:${person.id}] "${name}".` }],
-      };
+      try {
+        const person = await api.create({ first_name, last_name, emails, organization_ids, phone_numbers });
+        const name = [person.first_name, person.last_name].filter(Boolean).join(' ');
+        return {
+          content: [{ type: 'text', text: `Created person [id:${person.id}] "${name}".` }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -107,11 +112,13 @@ export function registerPeopleTools(server: McpServer, api: PeopleApi): void {
           content: [{ type: 'text', text: 'Provide at least one field to update.' }],
         };
       }
-      const person = await api.update(person_id, { first_name, last_name, emails, organization_ids, phone_numbers });
-      const name = [person.first_name, person.last_name].filter(Boolean).join(' ');
-      return {
-        content: [{ type: 'text', text: `Updated person [id:${person.id}] "${name}".` }],
-      };
+      try {
+        const person = await api.update(person_id, { first_name, last_name, emails, organization_ids, phone_numbers });
+        const name = [person.first_name, person.last_name].filter(Boolean).join(' ');
+        return {
+          content: [{ type: 'text', text: `Updated person [id:${person.id}] "${name}".` }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 }

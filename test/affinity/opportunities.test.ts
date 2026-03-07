@@ -70,6 +70,12 @@ describe('OpportunitiesApi.getById', () => {
     expect(await api.getById(999)).toBeNull();
   });
 
+  it('re-throws non-404 errors', async () => {
+    mockFetch('Internal Server Error', 500);
+    const api = new OpportunitiesApi(new AffinityClient('key'));
+    await expect(api.getById(1)).rejects.toThrow();
+  });
+
   it('caches result and avoids second fetch', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify(MOCK_OPP), { status: 200 }))

@@ -119,17 +119,6 @@ export interface AffinityNote {
   created_at: string;
 }
 
-export interface AffinityInteraction {
-  id: number;
-  type: number; // 0 = email, 1 = meeting
-  date: string;
-  subject: string | null;
-  body_text: string | null;
-  person_ids: number[];
-  organization_ids: number[];
-  creator_ids: number[];
-}
-
 export interface AffinityRelationshipStrength {
   entity_id: number;
   entity_type: number; // 0 = person, 1 = org
@@ -258,6 +247,23 @@ export interface AffinityMerge {
   base_entity_id: number;
   to_merge_entity_id: number;
   status: 'pending' | 'completed' | 'failed';
+}
+
+// Webhook subscriptions (v1)
+export interface AffinityWebhookSubscription {
+  id: number;
+  webhook_url: string;
+  subscriptions: string[];
+  state: 'active' | 'inactive';
+  created_at: string;
+}
+
+// Webhook event payload stored in KV after receipt
+export interface AffinityWebhookEvent {
+  id: string;
+  type: string;
+  body: Record<string, unknown>;
+  created_at: string;
 }
 
 // Utility

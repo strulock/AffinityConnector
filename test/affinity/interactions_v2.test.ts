@@ -68,6 +68,17 @@ describe('InteractionsV2Api.getEmails', () => {
     expect(url).toContain('/v2/');
     expect(url).toContain('/emails');
   });
+
+  it('includes page_token in URL when provided', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new InteractionsV2Api(new AffinityClient('key'));
+    await api.getEmails({ page_token: 'tok-e' });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain('page_token=tok-e');
+  });
 });
 
 describe('InteractionsV2Api.getCalls', () => {
@@ -101,6 +112,17 @@ describe('InteractionsV2Api.getMeetings', () => {
     ));
     const api = new InteractionsV2Api(new AffinityClient('key'));
     expect((await api.getMeetings()).meetings).toEqual([]);
+  });
+
+  it('includes page_token in URL when provided', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new InteractionsV2Api(new AffinityClient('key'));
+    await api.getMeetings({ page_token: 'tok-m' });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain('page_token=tok-m');
   });
 });
 

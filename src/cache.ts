@@ -20,6 +20,18 @@ export class KVCache {
     if (!this.kv) return;
     await this.kv.put(key, JSON.stringify(value), { expirationTtl: ttlSeconds });
   }
+
+  async delete(key: string): Promise<void> {
+    if (!this.kv) return;
+    await this.kv.delete(key);
+  }
+
+  /** Delete all keys that start with the given prefix. */
+  async deleteWithPrefix(prefix: string): Promise<void> {
+    if (!this.kv) return;
+    const { keys } = await this.kv.list({ prefix });
+    await Promise.all(keys.map(k => this.kv!.delete(k.name)));
+  }
 }
 
 // TTLs in seconds for different data categories
@@ -28,7 +40,6 @@ export const CACHE_TTL = {
   list: 600,          // list metadata — 10 min
   listEntries: 300,   // list entries — 5 min
   notes: 120,         // notes — 2 min
-  interactions: 120,  // interactions — 2 min
   strength: 300,      // relationship strength — 5 min
   fields: 600,        // field definitions — 10 min (schema changes infrequently)
   reminders: 120,     // reminders — 2 min (time-sensitive follow-ups)

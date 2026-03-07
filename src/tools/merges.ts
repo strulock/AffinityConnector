@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { MergesApi } from '../affinity/merges.js';
+import { toolError } from './_error.js';
 import type { AffinityMergeTask } from '../affinity/types.js';
 
 /**
@@ -45,11 +46,13 @@ export function registerMergeTools(server: McpServer, api: MergesApi): void {
       to_merge_person_id: z.number().int().describe('ID of the person record to merge in (will be deleted)'),
     },
     async ({ base_person_id, to_merge_person_id }) => {
-      const initial = await api.mergePersons(base_person_id, to_merge_person_id);
-      const task = (initial.status === 'completed' || initial.status === 'failed')
-        ? initial
-        : await pollUntilDone(api, initial.id, 'person');
-      return { content: [{ type: 'text', text: formatMergeResult(task, base_person_id, to_merge_person_id, 'person') }] };
+      try {
+        const initial = await api.mergePersons(base_person_id, to_merge_person_id);
+        const task = (initial.status === 'completed' || initial.status === 'failed')
+          ? initial
+          : await pollUntilDone(api, initial.id, 'person');
+        return { content: [{ type: 'text', text: formatMergeResult(task, base_person_id, to_merge_person_id, 'person') }] };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -61,11 +64,13 @@ export function registerMergeTools(server: McpServer, api: MergesApi): void {
       to_merge_company_id: z.number().int().describe('ID of the company record to merge in (will be deleted)'),
     },
     async ({ base_company_id, to_merge_company_id }) => {
-      const initial = await api.mergeCompanies(base_company_id, to_merge_company_id);
-      const task = (initial.status === 'completed' || initial.status === 'failed')
-        ? initial
-        : await pollUntilDone(api, initial.id, 'company');
-      return { content: [{ type: 'text', text: formatMergeResult(task, base_company_id, to_merge_company_id, 'company') }] };
+      try {
+        const initial = await api.mergeCompanies(base_company_id, to_merge_company_id);
+        const task = (initial.status === 'completed' || initial.status === 'failed')
+          ? initial
+          : await pollUntilDone(api, initial.id, 'company');
+        return { content: [{ type: 'text', text: formatMergeResult(task, base_company_id, to_merge_company_id, 'company') }] };
+      } catch (e) { return toolError(e); }
     }
   );
 }

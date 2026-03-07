@@ -86,6 +86,14 @@ describe('get_calls tool', () => {
     expect(text).toContain('1 call');
   });
 
+  it('shows pagination token when available', async () => {
+    const mockApi = { ...BASE_MOCK_API(), getCalls: vi.fn().mockResolvedValue({ calls: [MOCK_CALL], nextPageToken: 'tok-c' }) };
+    const { server, callTool } = makeMockServer();
+    registerInteractionsV2Tools(server, mockApi);
+    const result = await callTool('get_calls', { limit: 25 });
+    expect(result.content[0].text).toContain('tok-c');
+  });
+
   it('returns a message when no calls found', async () => {
     const mockApi = { ...BASE_MOCK_API(), getCalls: vi.fn().mockResolvedValue({ calls: [], nextPageToken: undefined }) };
     const { server, callTool } = makeMockServer();
@@ -114,6 +122,14 @@ describe('get_meetings tool', () => {
     expect(result.content[0].text).not.toContain(' — ');
   });
 
+  it('shows pagination token when available', async () => {
+    const mockApi = { ...BASE_MOCK_API(), getMeetings: vi.fn().mockResolvedValue({ meetings: [MOCK_MEETING], nextPageToken: 'tok-m' }) };
+    const { server, callTool } = makeMockServer();
+    registerInteractionsV2Tools(server, mockApi);
+    const result = await callTool('get_meetings', { limit: 25 });
+    expect(result.content[0].text).toContain('tok-m');
+  });
+
   it('returns a message when no meetings found', async () => {
     const mockApi = { ...BASE_MOCK_API(), getMeetings: vi.fn().mockResolvedValue({ meetings: [], nextPageToken: undefined }) };
     const { server, callTool } = makeMockServer();
@@ -140,6 +156,14 @@ describe('get_chat_messages tool', () => {
     registerInteractionsV2Tools(server, mockApi);
     const result = await callTool('get_chat_messages', { limit: 25 });
     expect(result.content[0].text).not.toContain(' — ');
+  });
+
+  it('shows pagination token when available', async () => {
+    const mockApi = { ...BASE_MOCK_API(), getChatMessages: vi.fn().mockResolvedValue({ messages: [MOCK_CHAT], nextPageToken: 'tok-chat' }) };
+    const { server, callTool } = makeMockServer();
+    registerInteractionsV2Tools(server, mockApi);
+    const result = await callTool('get_chat_messages', { limit: 25 });
+    expect(result.content[0].text).toContain('tok-chat');
   });
 
   it('returns a message when no chat messages found', async () => {

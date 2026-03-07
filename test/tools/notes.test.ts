@@ -1,9 +1,9 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { AffinityClient } from '../../src/affinity/client.js';
+import { AffinityClient, AffinityNotFoundError } from '../../src/affinity/client.js';
 import { NotesApi } from '../../src/affinity/notes.js';
 import { registerNotesTools } from '../../src/tools/notes.js';
 import { makeMockServer } from '../helpers/mock-server.js';
-import type { AffinityNote, AffinityInteraction } from '../../src/affinity/types.js';
+import type { AffinityNote } from '../../src/affinity/types.js';
 
 function setupWithMockApi(api: NotesApi) {
   const { server, callTool } = makeMockServer();
@@ -22,9 +22,6 @@ const MOCK_NOTE: AffinityNote = {
   is_deleted: false,
   created_at: '2024-01-15T10:00:00Z',
 };
-
-const MOCK_EMAIL: AffinityInteraction = { id: 10, type: 0, date: '2024-01-10T09:00:00Z', subject: 'Follow-up', body_text: 'Just checking in.', person_ids: [1], organization_ids: [], creator_ids: [99] };
-const MOCK_MEETING: AffinityInteraction = { id: 11, type: 1, date: '2024-01-12T14:00:00Z', subject: null, body_text: null, person_ids: [1], organization_ids: [], creator_ids: [99] };
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -68,12 +65,43 @@ describe('get_notes tool', () => {
     const mockApi = {
       getNotes: vi.fn().mockResolvedValue({ notes: [MOCK_NOTE], nextPageToken: 'next-page' }),
       createNote: vi.fn(),
-      getInteractions: vi.fn(),
     } as unknown as NotesApi;
     const { callTool } = setupWithMockApi(mockApi);
     const result = await callTool('get_notes', { person_id: 1, limit: 25 });
     expect(result.content[0].text).toContain('next-page');
     expect(result.content[0].text).toContain('More notes available');
+  });
+
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
+    const mockApi = {
+      getNotes: vi.fn().mockRejectedValue(new AffinityNotFoundError('person 999 not found')),
+      createNote: vi.fn(), getNoteReplies: vi.fn(), updateNote: vi.fn(), deleteNote: vi.fn(),
+    } as unknown as NotesApi;
+    const { callTool } = setupWithMockApi(mockApi);
+    const result = await callTool('get_notes', { person_id: 999, limit: 25 });
+    expect(result.content[0].text).toContain('Not found:');
+  });
+
+  it('re-throws unknown errors from get_notes', async () => {
+    const mockApi = {
+      getNotes: vi.fn().mockRejectedValue(new Error('network failure')),
+      createNote: vi.fn(), getNoteReplies: vi.fn(), updateNote: vi.fn(), deleteNote: vi.fn(),
+    } as unknown as NotesApi;
+    const { callTool } = setupWithMockApi(mockApi);
+    await expect(callTool('get_notes', { limit: 25 })).rejects.toThrow('network failure');
+  });
+});
+
+describe('get_notes formatting', () => {
+  it('formats a note with no person or org associations', async () => {
+    const noteNoAssoc = { ...MOCK_NOTE, person_ids: [], organization_ids: [] };
+    const { callTool } = setupNotes([noteNoAssoc]);
+    const result = await callTool('get_notes', { limit: 25 });
+    const text = result.content[0].text;
+    // targetStr should be empty — no "[people:..." or "[orgs:..." bracket
+    expect(text).not.toContain('[people:');
+    expect(text).not.toContain('[orgs:');
+    expect(text).toContain('Met at conference');
   });
 });
 
@@ -87,48 +115,15 @@ describe('create_note tool', () => {
     expect(result.content[0].text).toContain('Note created');
     expect(result.content[0].text).toContain('1');
   });
-});
 
-describe('get_interactions tool', () => {
-  it('formats email interactions', async () => {
-    const { callTool } = setupNotes([MOCK_EMAIL]);
-    const result = await callTool('get_interactions', { person_id: 1, limit: 25 });
-    const text = result.content[0].text;
-    expect(text).toContain('Email');
-    expect(text).toContain('Follow-up');
-    expect(text).toContain('Just checking in');
-  });
-
-  it('formats meeting interactions with no subject', async () => {
-    const { callTool } = setupNotes([MOCK_MEETING]);
-    const result = await callTool('get_interactions', { person_id: 1, limit: 25 });
-    const text = result.content[0].text;
-    expect(text).toContain('Meeting');
-    expect(text).not.toContain('null');
-  });
-
-  it('shows pagination token when available', async () => {
-    const { callTool } = setupNotes([]);
-    const result = await callTool('get_interactions', { limit: 25 });
-    expect(result.content[0].text).toContain('No interactions found');
-  });
-
-  it('returns a message when no interactions exist', async () => {
-    const { callTool } = setupNotes([]);
-    const result = await callTool('get_interactions', { limit: 25 });
-    expect(result.content[0].text).toContain('No interactions found');
-  });
-
-  it('shows pagination token when nextPageToken is returned', async () => {
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
     const mockApi = {
-      getNotes: vi.fn(),
-      createNote: vi.fn(),
-      getInteractions: vi.fn().mockResolvedValue({ interactions: [MOCK_EMAIL], nextPageToken: 'page-2' }),
+      getNotes: vi.fn(), createNote: vi.fn().mockRejectedValue(new AffinityNotFoundError('person 999 not found')),
+      getNoteReplies: vi.fn(), updateNote: vi.fn(), deleteNote: vi.fn(),
     } as unknown as NotesApi;
     const { callTool } = setupWithMockApi(mockApi);
-    const result = await callTool('get_interactions', { person_id: 1, limit: 25 });
-    expect(result.content[0].text).toContain('page-2');
-    expect(result.content[0].text).toContain('More interactions available');
+    const result = await callTool('create_note', { content: 'Test', person_ids: [999] });
+    expect(result.content[0].text).toContain('Not found:');
   });
 });
 
@@ -137,7 +132,7 @@ const MOCK_REPLY = { id: 200, note_id: 1, creator_id: 99, content: 'Great meetin
 describe('get_note_replies tool', () => {
   it('returns formatted replies', async () => {
     const mockApi = {
-      getNotes: vi.fn(), createNote: vi.fn(), getInteractions: vi.fn(),
+      getNotes: vi.fn(), createNote: vi.fn(),
       getNoteReplies: vi.fn().mockResolvedValue({ replies: [MOCK_REPLY], nextPageToken: undefined }),
       updateNote: vi.fn(), deleteNote: vi.fn(),
     } as unknown as NotesApi;
@@ -152,7 +147,7 @@ describe('get_note_replies tool', () => {
 
   it('shows pagination token when available', async () => {
     const mockApi = {
-      getNotes: vi.fn(), createNote: vi.fn(), getInteractions: vi.fn(),
+      getNotes: vi.fn(), createNote: vi.fn(),
       getNoteReplies: vi.fn().mockResolvedValue({ replies: [MOCK_REPLY], nextPageToken: 'tok-r' }),
       updateNote: vi.fn(), deleteNote: vi.fn(),
     } as unknown as NotesApi;
@@ -163,7 +158,7 @@ describe('get_note_replies tool', () => {
 
   it('returns a message when no replies exist', async () => {
     const mockApi = {
-      getNotes: vi.fn(), createNote: vi.fn(), getInteractions: vi.fn(),
+      getNotes: vi.fn(), createNote: vi.fn(),
       getNoteReplies: vi.fn().mockResolvedValue({ replies: [], nextPageToken: undefined }),
       updateNote: vi.fn(), deleteNote: vi.fn(),
     } as unknown as NotesApi;
@@ -176,7 +171,7 @@ describe('get_note_replies tool', () => {
 describe('update_note tool', () => {
   it('returns success with the note ID', async () => {
     const mockApi = {
-      getNotes: vi.fn(), createNote: vi.fn(), getInteractions: vi.fn(),
+      getNotes: vi.fn(), createNote: vi.fn(),
       getNoteReplies: vi.fn(),
       updateNote: vi.fn().mockResolvedValue({ ...MOCK_NOTE, content: 'Updated' }),
       deleteNote: vi.fn(),
@@ -186,12 +181,23 @@ describe('update_note tool', () => {
     expect(result.content[0].text).toContain('Updated note');
     expect(result.content[0].text).toContain('[id:1]');
   });
+
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
+    const mockApi = {
+      getNotes: vi.fn(), createNote: vi.fn(), getNoteReplies: vi.fn(),
+      updateNote: vi.fn().mockRejectedValue(new AffinityNotFoundError('note 999 not found')),
+      deleteNote: vi.fn(),
+    } as unknown as NotesApi;
+    const { callTool } = setupWithMockApi(mockApi);
+    const result = await callTool('update_note', { note_id: 999, content: 'Updated' });
+    expect(result.content[0].text).toContain('Not found:');
+  });
 });
 
 describe('delete_note tool', () => {
   it('returns a success message after deletion', async () => {
     const mockApi = {
-      getNotes: vi.fn(), createNote: vi.fn(), getInteractions: vi.fn(),
+      getNotes: vi.fn(), createNote: vi.fn(),
       getNoteReplies: vi.fn(), updateNote: vi.fn(),
       deleteNote: vi.fn().mockResolvedValue(undefined),
     } as unknown as NotesApi;
@@ -199,5 +205,15 @@ describe('delete_note tool', () => {
     const result = await callTool('delete_note', { note_id: 1 });
     expect(result.content[0].text).toContain('1');
     expect(result.content[0].text).toContain('deleted successfully');
+  });
+
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
+    const mockApi = {
+      getNotes: vi.fn(), createNote: vi.fn(), getNoteReplies: vi.fn(), updateNote: vi.fn(),
+      deleteNote: vi.fn().mockRejectedValue(new AffinityNotFoundError('note 999 not found')),
+    } as unknown as NotesApi;
+    const { callTool } = setupWithMockApi(mockApi);
+    const result = await callTool('delete_note', { note_id: 999 });
+    expect(result.content[0].text).toContain('Not found:');
   });
 });

@@ -53,13 +53,45 @@ describe('KVCache', () => {
     });
   });
 
+  describe('delete', () => {
+    it('removes a key from the store', async () => {
+      const cache = new KVCache(makeKVMock());
+      await cache.set('to-delete', { x: 1 }, 60);
+      await cache.delete('to-delete');
+      expect(await cache.get('to-delete')).toBeNull();
+    });
+
+    it('is a no-op when no KV namespace is configured', async () => {
+      const cache = new KVCache(undefined);
+      await expect(cache.delete('any-key')).resolves.toBeUndefined();
+    });
+  });
+
+  describe('deleteWithPrefix', () => {
+    it('deletes all keys matching the prefix', async () => {
+      const cache = new KVCache(makeKVMock());
+      await cache.set('people:search:Alice:20', ['Alice'], 60);
+      await cache.set('people:search:Bob:20', ['Bob'], 60);
+      await cache.set('orgs:1', { id: 1 }, 60);
+      await cache.deleteWithPrefix('people:search:');
+      expect(await cache.get('people:search:Alice:20')).toBeNull();
+      expect(await cache.get('people:search:Bob:20')).toBeNull();
+      // Non-matching key is untouched
+      expect(await cache.get('orgs:1')).toEqual({ id: 1 });
+    });
+
+    it('is a no-op when no KV namespace is configured', async () => {
+      const cache = new KVCache(undefined);
+      await expect(cache.deleteWithPrefix('people:search:')).resolves.toBeUndefined();
+    });
+  });
+
   describe('CACHE_TTL constants', () => {
     it('has expected TTL values', () => {
       expect(CACHE_TTL.profile).toBe(300);
       expect(CACHE_TTL.list).toBe(600);
       expect(CACHE_TTL.listEntries).toBe(300);
       expect(CACHE_TTL.notes).toBe(120);
-      expect(CACHE_TTL.interactions).toBe(120);
       expect(CACHE_TTL.strength).toBe(300);
     });
   });

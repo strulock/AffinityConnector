@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { RemindersApi } from '../affinity/reminders.js';
+import { toolError } from './_error.js';
 import type { AffinityReminder } from '../affinity/types.js';
 
 function formatReminder(r: AffinityReminder): string {
@@ -61,10 +62,12 @@ export function registerReminderTools(server: McpServer, api: RemindersApi): voi
         };
       }
 
-      const reminder = await api.createReminder({ content, due_date, person_ids, organization_ids, opportunity_ids });
-      return {
-        content: [{ type: 'text', text: `Created reminder [id:${reminder.id}] due ${reminder.due_date} — "${reminder.content}".` }],
-      };
+      try {
+        const reminder = await api.createReminder({ content, due_date, person_ids, organization_ids, opportunity_ids });
+        return {
+          content: [{ type: 'text', text: `Created reminder [id:${reminder.id}] due ${reminder.due_date} — "${reminder.content}".` }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -83,11 +86,13 @@ export function registerReminderTools(server: McpServer, api: RemindersApi): voi
           content: [{ type: 'text', text: 'Provide at least one field to update.' }],
         };
       }
-      const reminder = await api.updateReminder(reminder_id, { content, due_date, completed });
-      const status = reminder.completed_at ? 'completed' : `due ${reminder.due_date}`;
-      return {
-        content: [{ type: 'text', text: `Updated reminder [id:${reminder.id}] — ${status} — "${reminder.content}".` }],
-      };
+      try {
+        const reminder = await api.updateReminder(reminder_id, { content, due_date, completed });
+        const status = reminder.completed_at ? 'completed' : `due ${reminder.due_date}`;
+        return {
+          content: [{ type: 'text', text: `Updated reminder [id:${reminder.id}] — ${status} — "${reminder.content}".` }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -98,10 +103,12 @@ export function registerReminderTools(server: McpServer, api: RemindersApi): voi
       reminder_id: z.number().int().describe('Reminder ID to delete (from get_reminders)'),
     },
     async ({ reminder_id }) => {
-      await api.deleteReminder(reminder_id);
-      return {
-        content: [{ type: 'text', text: `Reminder ${reminder_id} deleted successfully.` }],
-      };
+      try {
+        await api.deleteReminder(reminder_id);
+        return {
+          content: [{ type: 'text', text: `Reminder ${reminder_id} deleted successfully.` }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 }

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ListsApi } from '../affinity/lists.js';
+import { toolError } from './_error.js';
 import type {
   AffinityList,
   AffinityListEntry,
@@ -43,6 +44,17 @@ function formatEntry(entry: AffinityListEntry): string {
   return `[entry:${entry.id}] ${label}`;
 }
 
+/** Convert an Affinity field value to a display label for grouping. */
+function valueLabel(value: unknown): string {
+  if (value === null || value === undefined) return '(unset)';
+  if (typeof value === 'object') {
+    const v = value as Record<string, unknown>;
+    if (v.text != null) return String(v.text);
+    return JSON.stringify(value);
+  }
+  return String(value);
+}
+
 function formatFieldValue(fv: AffinityFieldValue): string {
   const name = fv.field?.name ?? `Field ${fv.field_id}`;
   const value =
@@ -80,6 +92,7 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
       page_token: z.string().optional().describe('Pagination token from a previous call'),
     },
     async ({ list_id, limit, page_token }) => {
+      try {
       const { entries, nextPageToken } = await api.getListEntries(list_id, limit, page_token);
       if (entries.length === 0) {
         return { content: [{ type: 'text', text: `No entries found in list ${list_id}.` }] };
@@ -90,6 +103,7 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
         text += `\n\nMore entries available. Use page_token: "${nextPageToken}"`;
       }
       return { content: [{ type: 'text', text }] };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -100,6 +114,7 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
       list_entry_id: z.number().int().describe('List entry ID (from get_list_entries results)'),
     },
     async ({ list_entry_id }) => {
+      try {
       const values = await api.getFieldValues(list_entry_id);
       if (values.length === 0) {
         return {
@@ -115,6 +130,7 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
           },
         ],
       };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -149,22 +165,24 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
         };
       }
 
-      const result = await api.setFieldValue({
-        field_id,
-        entity_id: entity_id ?? 0,
-        entity_type: entity_type ?? 0,
-        list_entry_id: list_entry_id ?? 0,
-        value,
-        field_value_id,
-      });
+      try {
+        const result = await api.setFieldValue({
+          field_id,
+          entity_id: entity_id ?? 0,
+          entity_type: entity_type ?? 0,
+          list_entry_id: list_entry_id ?? 0,
+          value,
+          field_value_id,
+        });
 
-      const action = field_value_id != null ? 'Updated' : 'Created';
-      return {
-        content: [{
-          type: 'text',
-          text: `${action} field value [id:${result.id}] — field ${result.field_id} on list entry ${result.list_entry_id ?? list_entry_id}.`,
-        }],
-      };
+        const action = field_value_id != null ? 'Updated' : 'Created';
+        return {
+          content: [{
+            type: 'text',
+            text: `${action} field value [id:${result.id}] — field ${result.field_id} on list entry ${result.list_entry_id ?? list_entry_id}.`,
+          }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -175,10 +193,12 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
       field_value_id: z.number().int().describe('Field value ID to delete (from get_field_values results)'),
     },
     async ({ field_value_id }) => {
-      await api.deleteFieldValue(field_value_id);
-      return {
-        content: [{ type: 'text', text: `Field value ${field_value_id} deleted successfully.` }],
-      };
+      try {
+        await api.deleteFieldValue(field_value_id);
+        return {
+          content: [{ type: 'text', text: `Field value ${field_value_id} deleted successfully.` }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -191,10 +211,12 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
       entity_type: z.number().int().describe('Entity type: 0 = person, 1 = organization, 8 = opportunity'),
     },
     async ({ list_id, entity_id, entity_type }) => {
-      const entry = await api.addListEntry(list_id, entity_id, entity_type);
-      return {
-        content: [{ type: 'text', text: `Added entity ${entity_id} to list ${list_id}. List entry ID: ${entry.id}.` }],
-      };
+      try {
+        const entry = await api.addListEntry(list_id, entity_id, entity_type);
+        return {
+          content: [{ type: 'text', text: `Added entity ${entity_id} to list ${list_id}. List entry ID: ${entry.id}.` }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -206,10 +228,12 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
       list_entry_id: z.number().int().describe('List entry ID to remove (from get_list_entries)'),
     },
     async ({ list_id, list_entry_id }) => {
-      await api.removeListEntry(list_id, list_entry_id);
-      return {
-        content: [{ type: 'text', text: `List entry ${list_entry_id} removed from list ${list_id}.` }],
-      };
+      try {
+        await api.removeListEntry(list_id, list_entry_id);
+        return {
+          content: [{ type: 'text', text: `List entry ${list_entry_id} removed from list ${list_id}.` }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -249,11 +273,44 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
         .describe('Array of field_id + value pairs to update'),
     },
     async ({ list_id, list_entry_id, fields }) => {
-      const updated = await api.batchSetFieldValues(list_id, list_entry_id, fields);
+      try {
+        const updated = await api.batchSetFieldValues(list_id, list_entry_id, fields);
+        return {
+          content: [{
+            type: 'text',
+            text: `Updated ${updated.length} field value(s) on list entry ${list_entry_id} in list ${list_id}.`,
+          }],
+        };
+      } catch (e) { return toolError(e); }
+    }
+  );
+
+  server.tool(
+    'get_pipeline_summary',
+    'Summarize a pipeline list by the values of a dropdown field (e.g. deal stage). Returns entry counts per group, sorted by frequency. Use get_lists to find list IDs and get_field_definitions to find field IDs.',
+    {
+      list_id: z.number().int().describe('List ID (from get_lists)'),
+      field_id: z.number().int().describe('Field ID to group by (from get_field_definitions) — works best with dropdown fields'),
+    },
+    async ({ list_id, field_id }) => {
+      const values = await api.getFieldValuesByList(list_id, field_id);
+      if (values.length === 0) {
+        return {
+          content: [{ type: 'text', text: `No field values found for field ${field_id} in list ${list_id}.` }],
+        };
+      }
+      const counts: Record<string, number> = {};
+      for (const fv of values) {
+        const label = valueLabel(fv.value);
+        counts[label] = (counts[label] ?? 0) + 1;
+      }
+      const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+      const fieldName = values[0]?.field?.name ?? `Field ${field_id}`;
+      const lines = sorted.map(([label, count]) => `  ${label}: ${count}`);
       return {
         content: [{
           type: 'text',
-          text: `Updated ${updated.length} field value(s) on list entry ${list_entry_id} in list ${list_id}.`,
+          text: `Pipeline summary for list ${list_id} by "${fieldName}" (${values.length} entries total):\n\n${lines.join('\n')}`,
         }],
       };
     }

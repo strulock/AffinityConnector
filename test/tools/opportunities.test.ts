@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
+import { AffinityNotFoundError } from '../../src/affinity/client.js';
 import { OpportunitiesApi } from '../../src/affinity/opportunities.js';
 import { registerOpportunityTools } from '../../src/tools/opportunities.js';
 import { makeMockServer } from '../helpers/mock-server.js';
@@ -104,6 +105,17 @@ describe('get_opportunity tool', () => {
     expect(text).toContain('Organizations: none');
     expect(text).toContain('Lists: none');
   });
+
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
+    const { callTool } = setup({ getById: vi.fn().mockRejectedValue(new AffinityNotFoundError('opp 999 not found')) });
+    const result = await callTool('get_opportunity', { opportunity_id: 999 });
+    expect(result.content[0].text).toContain('Not found:');
+  });
+
+  it('re-throws unknown errors from get_opportunity', async () => {
+    const { callTool } = setup({ getById: vi.fn().mockRejectedValue(new Error('network failure')) });
+    await expect(callTool('get_opportunity', { opportunity_id: 1 })).rejects.toThrow('network failure');
+  });
 });
 
 // ── create_opportunity ────────────────────────────────────────────────────
@@ -124,6 +136,12 @@ describe('create_opportunity tool', () => {
       expect.objectContaining({ person_ids: [10], organization_ids: [20] })
     );
   });
+
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
+    const { callTool } = setup({ create: vi.fn().mockRejectedValue(new AffinityNotFoundError('person 999 not found')) });
+    const result = await callTool('create_opportunity', { name: 'Deal' });
+    expect(result.content[0].text).toContain('Not found:');
+  });
 });
 
 // ── update_opportunity ────────────────────────────────────────────────────
@@ -140,5 +158,11 @@ describe('update_opportunity tool', () => {
     const { callTool } = setup();
     const result = await callTool('update_opportunity', { opportunity_id: 1 });
     expect(result.content[0].text).toContain('at least one of');
+  });
+
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
+    const { callTool } = setup({ update: vi.fn().mockRejectedValue(new AffinityNotFoundError('opp 999 not found')) });
+    const result = await callTool('update_opportunity', { opportunity_id: 999, name: 'New Name' });
+    expect(result.content[0].text).toContain('Not found:');
   });
 });

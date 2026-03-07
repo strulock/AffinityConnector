@@ -22,7 +22,7 @@ export class PeopleApi {
     return people;
   }
 
-  /** Create a new person record (v1 POST /persons). */
+  /** Create a new person record (v1 POST /persons). Invalidates search cache. */
   async create(params: {
     first_name: string;
     last_name: string;
@@ -30,7 +30,9 @@ export class PeopleApi {
     organization_ids?: number[];
     phone_numbers?: string[];
   }): Promise<AffinityPerson> {
-    return this.client.post<AffinityPerson>('/persons', params);
+    const person = await this.client.post<AffinityPerson>('/persons', params);
+    await this.client.cache.deleteWithPrefix('people:search:');
+    return person;
   }
 
   /**
@@ -43,6 +45,7 @@ export class PeopleApi {
   ): Promise<AffinityPerson> {
     const person = await this.client.put<AffinityPerson>(`/persons/${personId}`, params);
     await this.client.cache.set(`people:${personId}`, person, CACHE_TTL.profile);
+    await this.client.cache.deleteWithPrefix('people:search:');
     return person;
   }
 

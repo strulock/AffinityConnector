@@ -20,7 +20,7 @@ export class IntelligenceApi {
     const result = await this.client.get<AffinityRelationshipStrength>('/relationships-strengths', {
       entity_id: entityId,
       entity_type: entityType,
-    });
+    }, 'v2');
     await this.client.cache.set(cacheKey, result, CACHE_TTL.strength);
     return result;
   }

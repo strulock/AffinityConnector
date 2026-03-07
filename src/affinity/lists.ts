@@ -109,6 +109,19 @@ export class ListsApi {
     return result.data ?? [];
   }
 
+  /**
+   * Fetch all field values for a given field across an entire list (v1).
+   * Returns one value per list entry that has the field set.
+   * Efficient for aggregation — single request instead of per-entry fetches.
+   */
+  async getFieldValuesByList(listId: number, fieldId: number): Promise<AffinityFieldValue[]> {
+    const values = await this.client.get<AffinityFieldValue[]>('/field-values', {
+      list_id: listId,
+      field_id: fieldId,
+    });
+    return Array.isArray(values) ? values : [];
+  }
+
   /** Remove a list entry (v1 DELETE /lists/{id}/list-entries/{entry_id}). */
   async removeListEntry(listId: number, listEntryId: number): Promise<void> {
     await this.client.del<{ success: boolean }>(`/lists/${listId}/list-entries/${listEntryId}`);

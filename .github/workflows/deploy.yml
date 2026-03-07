@@ -38,3 +38,8 @@ jobs:
         run: printf '%s' "${{ secrets.AFFINITY_API_KEY }}" | npx wrangler secret put AFFINITY_API_KEY
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+
+      - name: Set webhook secret
+        run: printf '%s' "${{ secrets.AFFINITY_WEBHOOK_SECRET }}" | npx wrangler secret put AFFINITY_WEBHOOK_SECRET
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

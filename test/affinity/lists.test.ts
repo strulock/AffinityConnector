@@ -94,6 +94,16 @@ describe('ListsApi.getListEntries', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('returns empty entries array when list_entries is missing from response', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({}), { status: 200 })
+    ));
+    const client = new AffinityClient('key');
+    const api = new ListsApi(client);
+    const result = await api.getListEntries(1);
+    expect(result.entries).toEqual([]);
+  });
+
   it('includes page_token in request when provided', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ list_entries: [], next_page_token: null }), { status: 200 })
@@ -166,6 +176,30 @@ describe('ListsApi.setFieldValue', () => {
     await api.setFieldValue({ field_id: 5, entity_id: 10, entity_type: 1, list_entry_id: 100, value: 'Series B', field_value_id: 200 });
     const body = JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string);
     expect(body).toEqual({ value: 'Series B' });
+  });
+});
+
+describe('ListsApi.getFieldValuesByList', () => {
+  it('GETs /field-values with list_id and field_id params', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([MOCK_FIELD_VALUE]), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new ListsApi(new AffinityClient('key'));
+    const result = await api.getFieldValuesByList(1, 5);
+    expect(result).toEqual([MOCK_FIELD_VALUE]);
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain('/field-values');
+    expect(url).toContain('list_id=1');
+    expect(url).toContain('field_id=5');
+  });
+
+  it('returns empty array when API returns a non-array', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(null), { status: 200 })
+    ));
+    const api = new ListsApi(new AffinityClient('key'));
+    expect(await api.getFieldValuesByList(1, 5)).toEqual([]);
   });
 });
 
@@ -292,6 +326,26 @@ describe('ListsApi.getSavedViewEntries', () => {
     const api = new ListsApi(new AffinityClient('key'));
     const result = await api.getSavedViewEntries(1, 10, 25);
     expect(result.nextPageToken).toBe('tok-xyz');
+  });
+
+  it('returns empty entries array when list_entries is missing', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({}), { status: 200 }))
+    ));
+    const api = new ListsApi(new AffinityClient('key'));
+    const result = await api.getSavedViewEntries(1, 10);
+    expect(result.entries).toEqual([]);
+  });
+
+  it('includes page_token in URL when provided', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ list_entries: [] }), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new ListsApi(new AffinityClient('key'));
+    await api.getSavedViewEntries(1, 10, 25, 'tok-sv');
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain('page_token=tok-sv');
   });
 });
 

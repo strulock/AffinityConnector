@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { AffinityClient } from '../../src/affinity/client.js';
+import { AffinityClient, AffinityNotFoundError } from '../../src/affinity/client.js';
 import { ListsApi } from '../../src/affinity/lists.js';
 import { registerListTools } from '../../src/tools/lists.js';
 import { makeMockServer } from '../helpers/mock-server.js';
@@ -119,6 +119,23 @@ describe('get_list_entries tool', () => {
     const result = await callTool('get_list_entries', { list_id: 1, limit: 25 });
     expect(result.content[0].text).toContain('No entries found');
   });
+
+  it('returns a Not found response when the API returns 404', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not found', { status: 404 })));
+    const api = new ListsApi(new AffinityClient('key'));
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, api);
+    const result = await callTool('get_list_entries', { list_id: 999, limit: 25 });
+    expect(result.content[0].text).toContain('Not found:');
+  });
+
+  it('re-throws unknown errors from get_list_entries', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network failure')));
+    const api = new ListsApi(new AffinityClient('key'));
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, api);
+    await expect(callTool('get_list_entries', { list_id: 1, limit: 25 })).rejects.toThrow('network failure');
+  });
 });
 
 describe('get_field_values tool', () => {
@@ -152,12 +169,30 @@ describe('get_field_values tool', () => {
     const result = await callTool('get_field_values', { list_entry_id: 101 });
     expect(result.content[0].text).toContain('No field values found');
   });
+
+  it('returns a Not found response when the API returns 404', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not found', { status: 404 })));
+    const api = new ListsApi(new AffinityClient('key'));
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, api);
+    const result = await callTool('get_field_values', { list_entry_id: 999 });
+    expect(result.content[0].text).toContain('Not found:');
+  });
+
+  it('re-throws unknown errors from get_field_values', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network failure')));
+    const api = new ListsApi(new AffinityClient('key'));
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, api);
+    await expect(callTool('get_field_values', { list_entry_id: 101 })).rejects.toThrow('network failure');
+  });
 });
 
 const BASE_MOCK_API = () => ({
   getLists: vi.fn(),
   getListEntries: vi.fn(),
   getFieldValues: vi.fn(),
+  getFieldValuesByList: vi.fn(),
   setFieldValue: vi.fn(),
   deleteFieldValue: vi.fn(),
   batchSetFieldValues: vi.fn(),
@@ -190,10 +225,27 @@ describe('set_field_value tool', () => {
     expect(result.content[0].text).toContain('200');
   });
 
+  it('falls back to input list_entry_id when result has none', async () => {
+    const noEntryId = { id: 300, field_id: 5, entity_type: 1, entity_id: 10, list_entry_id: null, value: 'x' };
+    const mockApi = { ...BASE_MOCK_API(), setFieldValue: vi.fn().mockResolvedValue(noEntryId) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('set_field_value', { field_id: 5, value: 'x', list_entry_id: 101, entity_id: 10, entity_type: 1 });
+    expect(result.content[0].text).toContain('101');
+  });
+
   it('returns validation error when creating without required params', async () => {
     const { callTool } = setup([]);
     const result = await callTool('set_field_value', { field_id: 5, value: 'x' });
     expect(result.content[0].text).toContain('list_entry_id, entity_id, and entity_type are required');
+  });
+
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
+    const mockApi = { ...BASE_MOCK_API(), setFieldValue: vi.fn().mockRejectedValue(new AffinityNotFoundError('list entry 999 not found')) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('set_field_value', { field_id: 5, value: 'x', field_value_id: 999 });
+    expect(result.content[0].text).toContain('Not found:');
   });
 });
 
@@ -206,6 +258,14 @@ describe('delete_field_value tool', () => {
     expect(mockApi.deleteFieldValue).toHaveBeenCalledWith(200);
     expect(result.content[0].text).toContain('200');
     expect(result.content[0].text).toContain('deleted successfully');
+  });
+
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
+    const mockApi = { ...BASE_MOCK_API(), deleteFieldValue: vi.fn().mockRejectedValue(new AffinityNotFoundError('field value 999 not found')) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('delete_field_value', { field_value_id: 999 });
+    expect(result.content[0].text).toContain('Not found:');
   });
 });
 
@@ -224,6 +284,14 @@ describe('add_to_list tool', () => {
     expect(result.content[0].text).toContain('999');
     expect(result.content[0].text).toContain('list 1');
   });
+
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
+    const mockApi = { ...BASE_MOCK_API(), addListEntry: vi.fn().mockRejectedValue(new AffinityNotFoundError('list 999 not found')) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('add_to_list', { list_id: 999, entity_id: 1, entity_type: 0 });
+    expect(result.content[0].text).toContain('Not found:');
+  });
 });
 
 describe('remove_from_list tool', () => {
@@ -235,6 +303,14 @@ describe('remove_from_list tool', () => {
     expect(mockApi.removeListEntry).toHaveBeenCalledWith(1, 100);
     expect(result.content[0].text).toContain('100');
     expect(result.content[0].text).toContain('list 1');
+  });
+
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
+    const mockApi = { ...BASE_MOCK_API(), removeListEntry: vi.fn().mockRejectedValue(new AffinityNotFoundError('list entry 999 not found')) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('remove_from_list', { list_id: 1, list_entry_id: 999 });
+    expect(result.content[0].text).toContain('Not found:');
   });
 });
 
@@ -328,5 +404,90 @@ describe('batch_set_field_values tool', () => {
       fields: [{ field_id: 7, value: 42 }],
     });
     expect(mockApi.batchSetFieldValues).toHaveBeenCalledWith(2, 200, [{ field_id: 7, value: 42 }]);
+  });
+
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
+    const mockApi = { ...BASE_MOCK_API(), batchSetFieldValues: vi.fn().mockRejectedValue(new AffinityNotFoundError('list entry 999 not found')) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('batch_set_field_values', {
+      list_id: 1, list_entry_id: 999, fields: [{ field_id: 5, value: 'x' }],
+    });
+    expect(result.content[0].text).toContain('Not found:');
+  });
+});
+
+const STAGE_FIELD = { id: 5, name: 'Stage', list_id: 1, value_type: 6, allows_multiple: false, is_required: false, is_read_only: false };
+
+describe('get_pipeline_summary tool', () => {
+  it('returns counts grouped by field value', async () => {
+    const fvs = [
+      { id: 1, field_id: 5, field: STAGE_FIELD, entity_type: 1, entity_id: 10, list_entry_id: 100, value: 'Prospecting' },
+      { id: 2, field_id: 5, field: STAGE_FIELD, entity_type: 1, entity_id: 11, list_entry_id: 101, value: 'Qualified' },
+      { id: 3, field_id: 5, field: STAGE_FIELD, entity_type: 1, entity_id: 12, list_entry_id: 102, value: 'Prospecting' },
+    ];
+    const mockApi = { ...BASE_MOCK_API(), getFieldValuesByList: vi.fn().mockResolvedValue(fvs) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('get_pipeline_summary', { list_id: 1, field_id: 5 });
+    const text = result.content[0].text;
+    expect(text).toContain('Stage');
+    expect(text).toContain('Prospecting: 2');
+    expect(text).toContain('Qualified: 1');
+    expect(text).toContain('3 entries total');
+  });
+
+  it('returns a message when no field values exist', async () => {
+    const mockApi = { ...BASE_MOCK_API(), getFieldValuesByList: vi.fn().mockResolvedValue([]) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('get_pipeline_summary', { list_id: 1, field_id: 5 });
+    expect(result.content[0].text).toContain('No field values found');
+  });
+
+  it('groups object values by their "text" property', async () => {
+    const fvs = [
+      { id: 1, field_id: 5, field: STAGE_FIELD, entity_type: 1, entity_id: 10, list_entry_id: 100, value: { id: 1, text: 'Seed' } },
+      { id: 2, field_id: 5, field: STAGE_FIELD, entity_type: 1, entity_id: 11, list_entry_id: 101, value: { id: 1, text: 'Seed' } },
+    ];
+    const mockApi = { ...BASE_MOCK_API(), getFieldValuesByList: vi.fn().mockResolvedValue(fvs) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('get_pipeline_summary', { list_id: 1, field_id: 5 });
+    expect(result.content[0].text).toContain('Seed: 2');
+  });
+
+  it('labels null values as "(unset)"', async () => {
+    const fvs = [
+      { id: 1, field_id: 5, field: STAGE_FIELD, entity_type: 1, entity_id: 10, list_entry_id: 100, value: null },
+      { id: 2, field_id: 5, field: null, entity_type: 1, entity_id: 11, list_entry_id: 101, value: null },
+    ];
+    const mockApi = { ...BASE_MOCK_API(), getFieldValuesByList: vi.fn().mockResolvedValue(fvs) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('get_pipeline_summary', { list_id: 1, field_id: 5 });
+    expect(result.content[0].text).toContain('(unset): 2');
+  });
+
+  it('falls back to "Field {id}" when field metadata is missing', async () => {
+    const fvs = [
+      { id: 1, field_id: 5, field: null, entity_type: 1, entity_id: 10, list_entry_id: 100, value: 'Stage A' },
+    ];
+    const mockApi = { ...BASE_MOCK_API(), getFieldValuesByList: vi.fn().mockResolvedValue(fvs) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('get_pipeline_summary', { list_id: 1, field_id: 5 });
+    expect(result.content[0].text).toContain('Field 5');
+  });
+
+  it('serializes object values without a "text" property via JSON.stringify', async () => {
+    const fvs = [
+      { id: 1, field_id: 5, field: STAGE_FIELD, entity_type: 1, entity_id: 10, list_entry_id: 100, value: { id: 99 } },
+    ];
+    const mockApi = { ...BASE_MOCK_API(), getFieldValuesByList: vi.fn().mockResolvedValue(fvs) };
+    const { server, callTool } = makeMockServer();
+    registerListTools(server, mockApi);
+    const result = await callTool('get_pipeline_summary', { list_id: 1, field_id: 5 });
+    expect(result.content[0].text).toContain('{"id":99}');
   });
 });

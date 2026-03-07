@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { AffinityClient } from '../../src/affinity/client.js';
+import { AffinityClient, AffinityNotFoundError } from '../../src/affinity/client.js';
 import { PeopleApi } from '../../src/affinity/people.js';
 import { registerPeopleTools } from '../../src/tools/people.js';
 import { makeMockServer } from '../helpers/mock-server.js';
@@ -112,6 +112,23 @@ describe('get_person tool', () => {
     expect(text).toContain('Organization IDs: none');
     expect(text).toContain('N/A');
   });
+
+  it('returns a Not found response when the API returns 404', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not found', { status: 404 })));
+    const api = new PeopleApi(new AffinityClient('key'));
+    const { server, callTool } = makeMockServer();
+    registerPeopleTools(server, api);
+    const result = await callTool('get_person', { person_id: 999 });
+    expect(result.content[0].text).toContain('Not found:');
+  });
+
+  it('re-throws unknown errors from get_person', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network failure')));
+    const api = new PeopleApi(new AffinityClient('key'));
+    const { server, callTool } = makeMockServer();
+    registerPeopleTools(server, api);
+    await expect(callTool('get_person', { person_id: 1 })).rejects.toThrow('network failure');
+  });
 });
 
 describe('create_person tool', () => {
@@ -122,6 +139,15 @@ describe('create_person tool', () => {
     expect(text).toContain('Created person');
     expect(text).toContain('[id:1]');
     expect(text).toContain('Alice Smith');
+  });
+
+  it('returns a Not found response when the API returns 404', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not found', { status: 404 })));
+    const api = new PeopleApi(new AffinityClient('key'));
+    const { server, callTool } = makeMockServer();
+    registerPeopleTools(server, api);
+    const result = await callTool('create_person', { first_name: 'Ghost', last_name: 'User' });
+    expect(result.content[0].text).toContain('Not found:');
   });
 
   it('passes optional fields through to the API', async () => {
@@ -160,5 +186,14 @@ describe('update_person tool', () => {
     const { callTool } = setup(MOCK_PERSON);
     const result = await callTool('update_person', { person_id: 1 });
     expect(result.content[0].text).toContain('Provide at least one field to update');
+  });
+
+  it('returns a Not found response when the API returns 404', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not found', { status: 404 })));
+    const api = new PeopleApi(new AffinityClient('key'));
+    const { server, callTool } = makeMockServer();
+    registerPeopleTools(server, api);
+    const result = await callTool('update_person', { person_id: 999, first_name: 'Ghost' });
+    expect(result.content[0].text).toContain('Not found:');
   });
 });

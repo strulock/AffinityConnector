@@ -74,6 +74,17 @@ describe('RemindersApi.createReminder', () => {
     expect((init as RequestInit).method).toBe('POST');
   });
 
+  it('defaults person_ids to [] when not provided', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify(MOCK_REMINDER), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new RemindersApi(new AffinityClient('key'));
+    await api.createReminder({ content: 'No people', due_date: '2024-03-01' });
+    const body = JSON.parse((fetchMock.mock.calls[0] as [string, RequestInit])[1].body as string);
+    expect(body.person_ids).toEqual([]);
+  });
+
   it('defaults empty arrays for missing association fields', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify(MOCK_REMINDER), { status: 200 }))

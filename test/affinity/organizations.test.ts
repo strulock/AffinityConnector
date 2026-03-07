@@ -117,6 +117,30 @@ describe('OrganizationsApi.create', () => {
     expect(body.domain).toBe('acme.com');
     expect(body.person_ids).toEqual([1, 2]);
   });
+
+  it('invalidates search cache after creating an organization', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ organizations: [MOCK_ORG] }), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const cache = makeKVMock();
+    const api = new OrganizationsApi(new AffinityClient('key', { cache }));
+    // Prime search cache
+    await api.search('Acme');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // Create should invalidate search cache
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(MOCK_ORG), { status: 200 })
+    ));
+    await api.create({ name: 'Acme Corp' });
+    // Next search must hit the API again
+    const fetchMock2 = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ organizations: [MOCK_ORG] }), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock2);
+    await api.search('Acme');
+    expect(fetchMock2).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('OrganizationsApi.update', () => {
@@ -148,5 +172,29 @@ describe('OrganizationsApi.update', () => {
     const cached = await api.getById(10);
     expect(cached.name).toBe('Acme Inc');
     expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('invalidates search cache after updating an organization', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ organizations: [MOCK_ORG] }), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const cache = makeKVMock();
+    const api = new OrganizationsApi(new AffinityClient('key', { cache }));
+    // Prime search cache
+    await api.search('Acme');
+    // Update should invalidate search cache
+    const updated = { ...MOCK_ORG, name: 'Acme Inc' };
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(updated), { status: 200 })
+    ));
+    await api.update(10, { name: 'Acme Inc' });
+    // Next search must hit the API again
+    const fetchMock2 = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ organizations: [updated] }), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock2);
+    await api.search('Acme');
+    expect(fetchMock2).toHaveBeenCalledTimes(1);
   });
 });

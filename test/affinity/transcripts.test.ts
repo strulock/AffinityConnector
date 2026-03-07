@@ -45,6 +45,17 @@ describe('TranscriptsApi.getTranscripts', () => {
     expect((await api.getTranscripts()).transcripts).toEqual([]);
   });
 
+  it('includes page_token in request when provided', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new TranscriptsApi(new AffinityClient('key'));
+    await api.getTranscripts({ page_token: 'my-token' });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain('page_token=my-token');
+  });
+
   it('uses v2 URL and /transcripts path', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
@@ -84,6 +95,25 @@ describe('TranscriptsApi.getTranscriptFragments', () => {
     const api = new TranscriptsApi(new AffinityClient('key'));
     const result = await api.getTranscriptFragments('tx-1');
     expect(result.nextPageToken).toBe('tok-frag');
+  });
+
+  it('includes page_token in request when provided', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new TranscriptsApi(new AffinityClient('key'));
+    await api.getTranscriptFragments('tx-1', { page_token: 'frag-tok' });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain('page_token=frag-tok');
+  });
+
+  it('returns empty array when data is null', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ data: null }), { status: 200 }))
+    ));
+    const api = new TranscriptsApi(new AffinityClient('key'));
+    expect((await api.getTranscriptFragments('tx-1')).fragments).toEqual([]);
   });
 
   it('uses v2 URL with /fragments path', async () => {

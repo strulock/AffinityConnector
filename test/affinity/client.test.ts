@@ -4,6 +4,7 @@ import {
   AffinityAuthError,
   AffinityPermissionError,
   AffinityNotFoundError,
+  AffinityConflictError,
   AffinityRateLimitError,
   AffinityServerError,
 } from '../../src/affinity/client.js';
@@ -114,6 +115,12 @@ describe('AffinityClient error handling', () => {
     mockFetch(404, { message: 'Not found' });
     const client = new AffinityClient('key');
     await expect(client.get('/test')).rejects.toThrow(AffinityNotFoundError);
+  });
+
+  it('throws AffinityConflictError on 409', async () => {
+    mockFetch(409, { message: 'Conflict' });
+    const client = new AffinityClient('key');
+    await expect(client.get('/test')).rejects.toThrow(AffinityConflictError);
   });
 
   it('throws AffinityServerError on 500', async () => {

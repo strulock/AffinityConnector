@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { OrganizationsApi } from '../affinity/organizations.js';
+import { toolError } from './_error.js';
 import type { AffinityOrganization } from '../affinity/types.js';
 
 function formatOrg(o: AffinityOrganization): string {
@@ -48,6 +49,7 @@ export function registerOrganizationTools(server: McpServer, api: OrganizationsA
       org_id: z.number().int().describe('Affinity organization ID'),
     },
     async ({ org_id }) => {
+      try {
       const org = await api.getById(org_id);
       const domains = org.domains.join(', ') || 'none';
       const people = org.person_ids.length ? org.person_ids.join(', ') : 'none';
@@ -66,6 +68,7 @@ export function registerOrganizationTools(server: McpServer, api: OrganizationsA
       ].join('\n');
 
       return { content: [{ type: 'text', text }] };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -78,10 +81,12 @@ export function registerOrganizationTools(server: McpServer, api: OrganizationsA
       person_ids: z.array(z.number().int()).optional().describe('Person IDs to associate with this org'),
     },
     async ({ name, domain, person_ids }) => {
-      const org = await api.create({ name, domain, person_ids });
-      return {
-        content: [{ type: 'text', text: `Created organization [id:${org.id}] "${org.name}".` }],
-      };
+      try {
+        const org = await api.create({ name, domain, person_ids });
+        return {
+          content: [{ type: 'text', text: `Created organization [id:${org.id}] "${org.name}".` }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -100,10 +105,12 @@ export function registerOrganizationTools(server: McpServer, api: OrganizationsA
           content: [{ type: 'text', text: 'Provide at least one field to update.' }],
         };
       }
-      const org = await api.update(org_id, { name, domain, person_ids });
-      return {
-        content: [{ type: 'text', text: `Updated organization [id:${org.id}] "${org.name}".` }],
-      };
+      try {
+        const org = await api.update(org_id, { name, domain, person_ids });
+        return {
+          content: [{ type: 'text', text: `Updated organization [id:${org.id}] "${org.name}".` }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 }

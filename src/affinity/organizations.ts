@@ -22,13 +22,15 @@ export class OrganizationsApi {
     return orgs;
   }
 
-  /** Create a new organization record (v1 POST /organizations). */
+  /** Create a new organization record (v1 POST /organizations). Invalidates search cache. */
   async create(params: {
     name: string;
     domain?: string;
     person_ids?: number[];
   }): Promise<AffinityOrganization> {
-    return this.client.post<AffinityOrganization>('/organizations', params);
+    const org = await this.client.post<AffinityOrganization>('/organizations', params);
+    await this.client.cache.deleteWithPrefix('orgs:search:');
+    return org;
   }
 
   /**
@@ -41,6 +43,7 @@ export class OrganizationsApi {
   ): Promise<AffinityOrganization> {
     const org = await this.client.put<AffinityOrganization>(`/organizations/${orgId}`, params);
     await this.client.cache.set(`orgs:${orgId}`, org, CACHE_TTL.profile);
+    await this.client.cache.deleteWithPrefix('orgs:search:');
     return org;
   }
 

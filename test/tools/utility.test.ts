@@ -29,6 +29,32 @@ describe('get_whoami tool', () => {
     expect(text).toContain('[user:1]');
     expect(text).toContain('[org:42]');
   });
+
+  it('shows "(unknown)" when both first and last name are empty', async () => {
+    const userNoName = { ...MOCK_USER, first_name: '', last_name: '' };
+    const mockApi = {
+      getCurrentUser: vi.fn().mockResolvedValue(userNoName),
+      getRateLimit: vi.fn(),
+    } as unknown as UtilityApi;
+    const { server, callTool } = makeMockServer();
+    registerUtilityTools(server, mockApi);
+    const result = await callTool('get_whoami', {});
+    expect(result.content[0].text).toContain('(unknown)');
+  });
+
+  it('omits org name when organization_name is null', async () => {
+    const userNoOrg = { ...MOCK_USER, organization_name: null };
+    const mockApi = {
+      getCurrentUser: vi.fn().mockResolvedValue(userNoOrg),
+      getRateLimit: vi.fn(),
+    } as unknown as UtilityApi;
+    const { server, callTool } = makeMockServer();
+    registerUtilityTools(server, mockApi);
+    const result = await callTool('get_whoami', {});
+    const text = result.content[0].text;
+    expect(text).toContain('Jane Doe');
+    expect(text).not.toContain(' at ');
+  });
 });
 
 describe('get_rate_limit tool', () => {

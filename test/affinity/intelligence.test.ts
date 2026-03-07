@@ -26,7 +26,7 @@ describe('IntelligenceApi.getRelationshipStrength', () => {
     expect(result).toEqual(MOCK_STRENGTH);
   });
 
-  it('requests with correct entity_id and entity_type params', async () => {
+  it('requests with correct entity_id and entity_type params on the v2 base URL', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
       new Response(JSON.stringify(MOCK_STRENGTH), { status: 200 })
     ));
@@ -34,6 +34,7 @@ describe('IntelligenceApi.getRelationshipStrength', () => {
     const api = new IntelligenceApi(client);
     await api.getRelationshipStrength(42, 1);
     const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
+    expect(url).toContain('/v2/');
     expect(url).toContain('entity_id=42');
     expect(url).toContain('entity_type=1');
   });

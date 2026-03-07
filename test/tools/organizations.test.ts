@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { AffinityClient } from '../../src/affinity/client.js';
+import { AffinityClient, AffinityNotFoundError } from '../../src/affinity/client.js';
 import { OrganizationsApi } from '../../src/affinity/organizations.js';
 import { registerOrganizationTools } from '../../src/tools/organizations.js';
 import { makeMockServer } from '../helpers/mock-server.js';
@@ -101,6 +101,23 @@ describe('get_organization tool', () => {
     expect(text).toContain('Person IDs: none');
     expect(text).toContain('N/A');
   });
+
+  it('returns a Not found response when the API returns 404', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not found', { status: 404 })));
+    const api = new OrganizationsApi(new AffinityClient('key'));
+    const { server, callTool } = makeMockServer();
+    registerOrganizationTools(server, api);
+    const result = await callTool('get_organization', { org_id: 999 });
+    expect(result.content[0].text).toContain('Not found:');
+  });
+
+  it('re-throws unknown errors from get_organization', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network failure')));
+    const api = new OrganizationsApi(new AffinityClient('key'));
+    const { server, callTool } = makeMockServer();
+    registerOrganizationTools(server, api);
+    await expect(callTool('get_organization', { org_id: 10 })).rejects.toThrow('network failure');
+  });
 });
 
 describe('create_organization tool', () => {
@@ -111,6 +128,15 @@ describe('create_organization tool', () => {
     expect(text).toContain('Created organization');
     expect(text).toContain('[id:10]');
     expect(text).toContain('Acme Corp');
+  });
+
+  it('returns a Not found response when the API returns 404', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not found', { status: 404 })));
+    const api = new OrganizationsApi(new AffinityClient('key'));
+    const { server, callTool } = makeMockServer();
+    registerOrganizationTools(server, api);
+    const result = await callTool('create_organization', { name: 'Ghost Corp' });
+    expect(result.content[0].text).toContain('Not found:');
   });
 
   it('passes optional fields through to the API', async () => {
@@ -144,5 +170,14 @@ describe('update_organization tool', () => {
     const { callTool } = setup(MOCK_ORG);
     const result = await callTool('update_organization', { org_id: 10 });
     expect(result.content[0].text).toContain('Provide at least one field to update');
+  });
+
+  it('returns a Not found response when the API returns 404', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not found', { status: 404 })));
+    const api = new OrganizationsApi(new AffinityClient('key'));
+    const { server, callTool } = makeMockServer();
+    registerOrganizationTools(server, api);
+    const result = await callTool('update_organization', { org_id: 999, name: 'Ghost Corp' });
+    expect(result.content[0].text).toContain('Not found:');
   });
 });

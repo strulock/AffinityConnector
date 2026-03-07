@@ -7,6 +7,7 @@ import { IntelligenceApi } from '../affinity/intelligence.js';
 import { PeopleApi } from '../affinity/people.js';
 import { OrganizationsApi } from '../affinity/organizations.js';
 import { NotesApi } from '../affinity/notes.js';
+import { InteractionsV2Api } from '../affinity/interactions_v2.js';
 import { AffinityNotFoundError } from '../affinity/client.js';
 import type { AffinityRelationshipStrength } from '../affinity/types.js';
 
@@ -23,7 +24,8 @@ export function registerIntelligenceTools(
   api: IntelligenceApi,
   peopleApi: PeopleApi,
   orgsApi: OrganizationsApi,
-  notesApi: NotesApi
+  notesApi: NotesApi,
+  interactionsV2Api: InteractionsV2Api
 ): void {
   server.tool(
     'get_relationship_strength',
@@ -195,13 +197,17 @@ export function registerIntelligenceTools(
           sections.push('## Recent Notes\nNone.');
         }
 
-        // Recent interactions
-        const { interactions } = await notesApi.getInteractions({ person_id, limit: 5 });
-        if (interactions.length) {
-          const intLines = interactions.map(
-            (i) => `[${i.type === 0 ? 'Email' : 'Meeting'} ${new Date(i.date).toLocaleDateString()}] ${i.subject ?? '(no subject)'}`
-          );
-          sections.push(`## Recent Interactions (${interactions.length})\n${intLines.join('\n')}`);
+        // Recent interactions (v2)
+        const [{ emails }, { meetings }] = await Promise.all([
+          interactionsV2Api.getEmails({ person_id, limit: 5 }),
+          interactionsV2Api.getMeetings({ person_id, limit: 5 }),
+        ]);
+        const intLines = [
+          ...emails.map(e => `[Email ${new Date(e.sent_at).toLocaleDateString()}] ${e.subject ?? '(no subject)'}`),
+          ...meetings.map(m => `[Meeting ${new Date(m.start_time).toLocaleDateString()}] ${m.title ?? '(no title)'}`),
+        ];
+        if (intLines.length) {
+          sections.push(`## Recent Interactions (${intLines.length})\n${intLines.join('\n')}`);
         } else {
           sections.push('## Recent Interactions\nNone.');
         }
@@ -229,13 +235,17 @@ export function registerIntelligenceTools(
           sections.push('## Recent Notes\nNone.');
         }
 
-        // Recent interactions
-        const { interactions } = await notesApi.getInteractions({ organization_id, limit: 5 });
-        if (interactions.length) {
-          const intLines = interactions.map(
-            (i) => `[${i.type === 0 ? 'Email' : 'Meeting'} ${new Date(i.date).toLocaleDateString()}] ${i.subject ?? '(no subject)'}`
-          );
-          sections.push(`## Recent Interactions (${interactions.length})\n${intLines.join('\n')}`);
+        // Recent interactions (v2)
+        const [{ emails: orgEmails }, { meetings: orgMeetings }] = await Promise.all([
+          interactionsV2Api.getEmails({ organization_id, limit: 5 }),
+          interactionsV2Api.getMeetings({ organization_id, limit: 5 }),
+        ]);
+        const orgIntLines = [
+          ...orgEmails.map(e => `[Email ${new Date(e.sent_at).toLocaleDateString()}] ${e.subject ?? '(no subject)'}`),
+          ...orgMeetings.map(m => `[Meeting ${new Date(m.start_time).toLocaleDateString()}] ${m.title ?? '(no title)'}`),
+        ];
+        if (orgIntLines.length) {
+          sections.push(`## Recent Interactions (${orgIntLines.length})\n${orgIntLines.join('\n')}`);
         } else {
           sections.push('## Recent Interactions\nNone.');
         }

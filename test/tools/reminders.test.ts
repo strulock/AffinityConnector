@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { RemindersApi } from '../../src/affinity/reminders.js';
-import { AffinityClient } from '../../src/affinity/client.js';
+import { AffinityClient, AffinityNotFoundError } from '../../src/affinity/client.js';
 import { registerReminderTools } from '../../src/tools/reminders.js';
 import { makeMockServer } from '../helpers/mock-server.js';
 import type { AffinityReminder } from '../../src/affinity/types.js';
@@ -32,6 +32,18 @@ const BASE_MOCK_API = () => ({
   deleteReminder: vi.fn(),
 });
 
+const ORG_ONLY_REMINDER: AffinityReminder = {
+  ...MOCK_REMINDER, id: 3, person_ids: [], organization_ids: [20], opportunity_ids: [],
+};
+
+const OPP_ONLY_REMINDER: AffinityReminder = {
+  ...MOCK_REMINDER, id: 4, person_ids: [], organization_ids: [], opportunity_ids: [30],
+};
+
+const NO_ASSOC_REMINDER: AffinityReminder = {
+  ...MOCK_REMINDER, id: 5, person_ids: [], organization_ids: [], opportunity_ids: [],
+};
+
 describe('get_reminders tool', () => {
   it('returns formatted reminders', async () => {
     const mockApi = { ...BASE_MOCK_API(), getReminders: vi.fn().mockResolvedValue([MOCK_REMINDER]) };
@@ -44,6 +56,33 @@ describe('get_reminders tool', () => {
     expect(text).toContain('[reminder:1]');
     expect(text).toContain('people: 10');
     expect(text).toContain('1 reminder');
+  });
+
+  it('formats a reminder associated with an organization (no people)', async () => {
+    const mockApi = { ...BASE_MOCK_API(), getReminders: vi.fn().mockResolvedValue([ORG_ONLY_REMINDER]) };
+    const { server, callTool } = makeMockServer();
+    registerReminderTools(server, mockApi);
+    const result = await callTool('get_reminders', {});
+    expect(result.content[0].text).toContain('orgs: 20');
+    expect(result.content[0].text).not.toContain('people:');
+  });
+
+  it('formats a reminder associated with an opportunity only', async () => {
+    const mockApi = { ...BASE_MOCK_API(), getReminders: vi.fn().mockResolvedValue([OPP_ONLY_REMINDER]) };
+    const { server, callTool } = makeMockServer();
+    registerReminderTools(server, mockApi);
+    const result = await callTool('get_reminders', {});
+    expect(result.content[0].text).toContain('opps: 30');
+    expect(result.content[0].text).not.toContain('people:');
+  });
+
+  it('formats a reminder with no associations (empty bracket omitted)', async () => {
+    const mockApi = { ...BASE_MOCK_API(), getReminders: vi.fn().mockResolvedValue([NO_ASSOC_REMINDER]) };
+    const { server, callTool } = makeMockServer();
+    registerReminderTools(server, mockApi);
+    const result = await callTool('get_reminders', {});
+    expect(result.content[0].text).not.toContain('[people:');
+    expect(result.content[0].text).not.toContain('[orgs:');
   });
 
   it('shows "completed" status for completed reminders', async () => {
@@ -95,6 +134,36 @@ describe('create_reminder tool', () => {
     expect(result.content[0].text).toContain('At least one of');
     expect(mockApi.createReminder).not.toHaveBeenCalled();
   });
+
+  it('accepts organization_ids without person_ids', async () => {
+    const mockApi = { ...BASE_MOCK_API(), createReminder: vi.fn().mockResolvedValue(ORG_ONLY_REMINDER) };
+    const { server, callTool } = makeMockServer();
+    registerReminderTools(server, mockApi);
+    const result = await callTool('create_reminder', {
+      content: 'Follow up with org', due_date: '2024-04-01', organization_ids: [20],
+    });
+    expect(result.content[0].text).toContain('Created reminder');
+    expect(mockApi.createReminder).toHaveBeenCalled();
+  });
+
+  it('accepts opportunity_ids when person_ids is an empty array', async () => {
+    const mockApi = { ...BASE_MOCK_API(), createReminder: vi.fn().mockResolvedValue(OPP_ONLY_REMINDER) };
+    const { server, callTool } = makeMockServer();
+    registerReminderTools(server, mockApi);
+    // person_ids: [] is truthy but length 0 — exercises person_ids.length > 0 false branch
+    const result = await callTool('create_reminder', {
+      content: 'Check in', due_date: '2024-04-01', person_ids: [], opportunity_ids: [30],
+    });
+    expect(result.content[0].text).toContain('Created reminder');
+  });
+
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
+    const mockApi = { ...BASE_MOCK_API(), createReminder: vi.fn().mockRejectedValue(new AffinityNotFoundError('person 999 not found')) };
+    const { server, callTool } = makeMockServer();
+    registerReminderTools(server, mockApi);
+    const result = await callTool('create_reminder', { content: 'Test', due_date: '2024-03-01', person_ids: [999] });
+    expect(result.content[0].text).toContain('Not found:');
+  });
 });
 
 describe('update_reminder tool', () => {
@@ -126,6 +195,14 @@ describe('update_reminder tool', () => {
     expect(result.content[0].text).toContain('Provide at least one field');
     expect(mockApi.updateReminder).not.toHaveBeenCalled();
   });
+
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
+    const mockApi = { ...BASE_MOCK_API(), updateReminder: vi.fn().mockRejectedValue(new AffinityNotFoundError('reminder 999 not found')) };
+    const { server, callTool } = makeMockServer();
+    registerReminderTools(server, mockApi);
+    const result = await callTool('update_reminder', { reminder_id: 999, content: 'Updated' });
+    expect(result.content[0].text).toContain('Not found:');
+  });
 });
 
 describe('delete_reminder tool', () => {
@@ -137,5 +214,13 @@ describe('delete_reminder tool', () => {
     expect(mockApi.deleteReminder).toHaveBeenCalledWith(1);
     expect(result.content[0].text).toContain('1');
     expect(result.content[0].text).toContain('deleted successfully');
+  });
+
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
+    const mockApi = { ...BASE_MOCK_API(), deleteReminder: vi.fn().mockRejectedValue(new AffinityNotFoundError('reminder 999 not found')) };
+    const { server, callTool } = makeMockServer();
+    registerReminderTools(server, mockApi);
+    const result = await callTool('delete_reminder', { reminder_id: 999 });
+    expect(result.content[0].text).toContain('Not found:');
   });
 });
