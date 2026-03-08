@@ -14,8 +14,15 @@ vi.mock('@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js', () => (
   },
 }));
 
+// Mock Access JWT verification so routing tests don't need real RSA keys.
+// Default: valid. Override per-test with vi.mocked(verifyAccessJwt).mockResolvedValue(false).
+vi.mock('../src/access.js', () => ({
+  verifyAccessJwt: vi.fn().mockResolvedValue(true),
+}));
+
 // Import after mocks are set up
 const { default: worker } = await import('../src/index.js');
+const { verifyAccessJwt } = await import('../src/access.js');
 
 function makeRequest(method: string, path: string, headers: Record<string, string> = {}): Request {
   return new Request(`https://affinity.trulock.com${path}`, { method, headers });
@@ -23,6 +30,15 @@ function makeRequest(method: string, path: string, headers: Record<string, strin
 
 function makeEnv(apiKey = 'test-key'): unknown {
   return { AFFINITY_API_KEY: apiKey, AFFINITY_CACHE: undefined };
+}
+
+function makeEnvWithAccess(apiKey = 'test-key'): unknown {
+  return {
+    AFFINITY_API_KEY: apiKey,
+    AFFINITY_CACHE: undefined,
+    CLOUDFLARE_ACCESS_AUD: 'test-aud',
+    CLOUDFLARE_ACCESS_TEAM_DOMAIN: 'test.cloudflareaccess.com',
+  };
 }
 
 afterEach(() => {
@@ -157,5 +173,62 @@ describe('POST /webhook route', () => {
     await worker.fetch(makeWebhookRequest('secret'), env, {} as never);
     const recent = JSON.parse(await kv.get('webhook:recent') ?? '[]') as string[];
     expect(recent.filter(id => id === 'evt-1')).toHaveLength(1);
+  });
+});
+
+describe('POST /mcp — Cloudflare Access JWT validation', () => {
+  afterEach(() => {
+    vi.mocked(verifyAccessJwt).mockResolvedValue(true);
+  });
+
+  it('skips JWT check when Access vars are not configured', async () => {
+    // makeEnv() has no CLOUDFLARE_ACCESS_AUD — validation is bypassed
+    const res = await worker.fetch(makeRequest('POST', '/mcp'), makeEnv('real-key'), {} as never);
+    expect(res.status).toBe(200);
+    expect(vi.mocked(verifyAccessJwt)).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 when Cf-Access-Jwt-Assertion header is missing', async () => {
+    const res = await worker.fetch(makeRequest('POST', '/mcp'), makeEnvWithAccess(), {} as never);
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 401 when JWT verification fails', async () => {
+    vi.mocked(verifyAccessJwt).mockResolvedValue(false);
+    const req = new Request('https://affinity.trulock.com/mcp', {
+      method: 'POST',
+      headers: { 'Cf-Access-Jwt-Assertion': 'bad.token.here' },
+    });
+    const res = await worker.fetch(req, makeEnvWithAccess(), {} as never);
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 200 when JWT verification passes', async () => {
+    vi.mocked(verifyAccessJwt).mockResolvedValue(true);
+    const req = new Request('https://affinity.trulock.com/mcp', {
+      method: 'POST',
+      headers: { 'Cf-Access-Jwt-Assertion': 'valid.token.here' },
+    });
+    const res = await worker.fetch(req, makeEnvWithAccess(), {} as never);
+    expect(res.status).toBe(200);
+  });
+
+  it('calls verifyAccessJwt with the correct aud and team domain', async () => {
+    const req = new Request('https://affinity.trulock.com/mcp', {
+      method: 'POST',
+      headers: { 'Cf-Access-Jwt-Assertion': 'some.token.value' },
+    });
+    await worker.fetch(req, makeEnvWithAccess(), {} as never);
+    expect(vi.mocked(verifyAccessJwt)).toHaveBeenCalledWith(
+      'some.token.value',
+      'test-aud',
+      'test.cloudflareaccess.com',
+    );
+  });
+
+  it('returns 401 with CORS headers so the browser gets a readable error', async () => {
+    const res = await worker.fetch(makeRequest('POST', '/mcp'), makeEnvWithAccess(), {} as never);
+    expect(res.status).toBe(401);
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://claude.ai');
   });
 });

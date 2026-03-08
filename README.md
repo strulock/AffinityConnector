@@ -764,6 +764,8 @@ Required GitHub repository secrets:
 |--------|-------------|
 | `CLOUDFLARE_API_TOKEN` | Cloudflare API token with Workers and KV edit permissions |
 | `AFFINITY_API_KEY` | Affinity CRM API key |
+| `AFFINITY_WEBHOOK_SECRET` | Shared secret for verifying inbound Affinity webhook payloads |
+| `CLOUDFLARE_ACCESS_AUD` | Application Audience tag from Zero Trust → Access → Applications |
 
 ### Local development
 
@@ -794,15 +796,17 @@ compatibility_flags = ["nodejs_compat"]
 [vars]
 AFFINITY_V1_BASE_URL = "https://api.affinity.co"
 AFFINITY_V2_BASE_URL = "https://api.affinity.co/v2"
+CLOUDFLARE_ACCESS_TEAM_DOMAIN = "yourteam.cloudflareaccess.com"
 
 [[kv_namespaces]]
 binding = "AFFINITY_CACHE"
 id = "your-kv-namespace-id-here"
 ```
 
-**Secrets** (set via `wrangler secret put`):
+**Secrets** (set via `wrangler secret put` or automatically by CI):
 - `AFFINITY_API_KEY` — your Affinity API key, encrypted at rest in Cloudflare
-- `AFFINITY_WEBHOOK_SECRET` — shared secret for verifying inbound Affinity webhook payloads (Phase 16, set before enabling webhooks)
+- `AFFINITY_WEBHOOK_SECRET` — shared secret for verifying inbound Affinity webhook payloads
+- `CLOUDFLARE_ACCESS_AUD` — Application Audience tag from Zero Trust → Access → Applications; used by the Worker to verify Cloudflare Access JWTs on `/mcp`
 
 ---
 
@@ -881,7 +885,7 @@ If `/webhook` still returns an Access redirect, check that:
 
 | Path | Authentication |
 |------|---------------|
-| `/mcp` | Cloudflare Access (SSO required) |
+| `/mcp` | Cloudflare Access (SSO) + Worker-level JWT verification (`Cf-Access-Jwt-Assertion`) |
 | `/health` | Cloudflare Access (SSO required) |
 | `/.well-known/*` | Cloudflare Access (SSO required) |
 | `/webhook` | HMAC secret header (`X-Affinity-Webhook-Secret`) verified in Worker code |
