@@ -2,6 +2,7 @@ import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/
 import { createServer } from "./server.js";
 import { KVCache } from "./cache.js";
 import type { AffinityWebhookEvent } from "./affinity/types.js";
+import { verifyAccessJwt } from "./access.js";
 
 export interface Env {
   AFFINITY_API_KEY: string;
@@ -9,6 +10,12 @@ export interface Env {
   AFFINITY_V2_BASE_URL?: string;
   AFFINITY_CACHE: KVNamespace;
   AFFINITY_WEBHOOK_SECRET?: string;
+  // Cloudflare Access JWT validation (defense-in-depth for /mcp).
+  // Set CLOUDFLARE_ACCESS_AUD to the Application Audience tag from the Access app.
+  // Set CLOUDFLARE_ACCESS_TEAM_DOMAIN to e.g. "myteam.cloudflareaccess.com".
+  // If either is unset, JWT validation is skipped.
+  CLOUDFLARE_ACCESS_AUD?: string;
+  CLOUDFLARE_ACCESS_TEAM_DOMAIN?: string;
 }
 
 // Claude.ai connects from the browser, so CORS is required.
@@ -118,6 +125,13 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
 async function handleMcp(request: Request, env: Env): Promise<Response> {
   if (!env.AFFINITY_API_KEY) {
     return withCors(new Response("AFFINITY_API_KEY secret is not configured.", { status: 500 }));
+  }
+
+  if (env.CLOUDFLARE_ACCESS_AUD && env.CLOUDFLARE_ACCESS_TEAM_DOMAIN) {
+    const token = request.headers.get("Cf-Access-Jwt-Assertion");
+    if (!token || !(await verifyAccessJwt(token, env.CLOUDFLARE_ACCESS_AUD, env.CLOUDFLARE_ACCESS_TEAM_DOMAIN))) {
+      return withCors(new Response("Unauthorized", { status: 401 }));
+    }
   }
 
   const transport = new WebStandardStreamableHTTPServerTransport({

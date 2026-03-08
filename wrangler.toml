@@ -10,6 +10,10 @@ routes = [
 [vars]
 AFFINITY_V1_BASE_URL = "https://api.affinity.co"
 AFFINITY_V2_BASE_URL = "https://api.affinity.co/v2"
+# Cloudflare Access JWT validation for /mcp (defense-in-depth).
+# CLOUDFLARE_ACCESS_AUD is a Cloudflare secret (set via wrangler secret put in CI).
+# CLOUDFLARE_ACCESS_TEAM_DOMAIN: your Zero Trust team domain.
+CLOUDFLARE_ACCESS_TEAM_DOMAIN = "trulock.cloudflareaccess.com"
 
 [[kv_namespaces]]
 binding = "AFFINITY_CACHE"
