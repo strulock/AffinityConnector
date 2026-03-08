@@ -24,7 +24,7 @@ async function fetchKeys(teamDomain: string): Promise<Map<string, CryptoKey>> {
   const map = new Map<string, CryptoKey>();
   for (const jwk of keys) {
     const key = await crypto.subtle.importKey(
-      "jwk", jwk as JsonWebKey,
+      "jwk", jwk as unknown as JsonWebKey,
       { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
       false, ["verify"],
     );
