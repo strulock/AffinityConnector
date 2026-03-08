@@ -11,9 +11,10 @@ export interface Env {
   AFFINITY_CACHE: KVNamespace;
   AFFINITY_WEBHOOK_SECRET?: string;
   // Cloudflare Access JWT validation (defense-in-depth for /mcp).
-  // Set CLOUDFLARE_ACCESS_AUD to the Application Audience tag from the Access app.
-  // Set CLOUDFLARE_ACCESS_TEAM_DOMAIN to e.g. "myteam.cloudflareaccess.com".
-  // If either is unset, JWT validation is skipped.
+  // Set CLOUDFLARE_ACCESS_JWT_VALIDATION = true in wrangler.toml to enable.
+  // When enabled, CLOUDFLARE_ACCESS_AUD (secret) and CLOUDFLARE_ACCESS_TEAM_DOMAIN (var)
+  // must also be set. If the flag is false or unset, JWT validation is skipped entirely.
+  CLOUDFLARE_ACCESS_JWT_VALIDATION?: boolean;
   CLOUDFLARE_ACCESS_AUD?: string;
   CLOUDFLARE_ACCESS_TEAM_DOMAIN?: string;
 }
@@ -127,7 +128,7 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
     return withCors(new Response("AFFINITY_API_KEY secret is not configured.", { status: 500 }));
   }
 
-  if (env.CLOUDFLARE_ACCESS_AUD && env.CLOUDFLARE_ACCESS_TEAM_DOMAIN) {
+  if (env.CLOUDFLARE_ACCESS_JWT_VALIDATION && env.CLOUDFLARE_ACCESS_AUD && env.CLOUDFLARE_ACCESS_TEAM_DOMAIN) {
     const token = request.headers.get("Cf-Access-Jwt-Assertion");
     if (!token || !(await verifyAccessJwt(token, env.CLOUDFLARE_ACCESS_AUD, env.CLOUDFLARE_ACCESS_TEAM_DOMAIN))) {
       return withCors(new Response("Unauthorized", { status: 401 }));

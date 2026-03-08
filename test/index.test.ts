@@ -32,10 +32,11 @@ function makeEnv(apiKey = 'test-key'): unknown {
   return { AFFINITY_API_KEY: apiKey, AFFINITY_CACHE: undefined };
 }
 
-function makeEnvWithAccess(apiKey = 'test-key'): unknown {
+function makeEnvWithAccess(apiKey = 'test-key', jwtValidation = true): unknown {
   return {
     AFFINITY_API_KEY: apiKey,
     AFFINITY_CACHE: undefined,
+    CLOUDFLARE_ACCESS_JWT_VALIDATION: jwtValidation,
     CLOUDFLARE_ACCESS_AUD: 'test-aud',
     CLOUDFLARE_ACCESS_TEAM_DOMAIN: 'test.cloudflareaccess.com',
   };
@@ -181,9 +182,14 @@ describe('POST /mcp — Cloudflare Access JWT validation', () => {
     vi.mocked(verifyAccessJwt).mockResolvedValue(true);
   });
 
-  it('skips JWT check when Access vars are not configured', async () => {
-    // makeEnv() has no CLOUDFLARE_ACCESS_AUD — validation is bypassed
+  it('skips JWT check when CLOUDFLARE_ACCESS_JWT_VALIDATION is not set', async () => {
     const res = await worker.fetch(makeRequest('POST', '/mcp'), makeEnv('real-key'), {} as never);
+    expect(res.status).toBe(200);
+    expect(vi.mocked(verifyAccessJwt)).not.toHaveBeenCalled();
+  });
+
+  it('skips JWT check when CLOUDFLARE_ACCESS_JWT_VALIDATION is false', async () => {
+    const res = await worker.fetch(makeRequest('POST', '/mcp'), makeEnvWithAccess('real-key', false), {} as never);
     expect(res.status).toBe(200);
     expect(vi.mocked(verifyAccessJwt)).not.toHaveBeenCalled();
   });
