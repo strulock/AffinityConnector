@@ -128,7 +128,10 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
     return withCors(new Response("Server configuration error.", { status: 500 }));
   }
 
-  if (env.CLOUDFLARE_ACCESS_JWT_VALIDATION && env.CLOUDFLARE_ACCESS_AUD && env.CLOUDFLARE_ACCESS_TEAM_DOMAIN) {
+  if (env.CLOUDFLARE_ACCESS_JWT_VALIDATION) {
+    if (!env.CLOUDFLARE_ACCESS_AUD || !env.CLOUDFLARE_ACCESS_TEAM_DOMAIN) {
+      return withCors(new Response("Access JWT validation enabled but CLOUDFLARE_ACCESS_AUD or CLOUDFLARE_ACCESS_TEAM_DOMAIN is missing.", { status: 500 }));
+    }
     const token = request.headers.get("Cf-Access-Jwt-Assertion");
     if (!token || !(await verifyAccessJwt(token, env.CLOUDFLARE_ACCESS_AUD, env.CLOUDFLARE_ACCESS_TEAM_DOMAIN))) {
       return withCors(new Response("Unauthorized", { status: 401 }));
