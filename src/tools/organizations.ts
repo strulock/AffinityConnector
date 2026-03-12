@@ -7,7 +7,7 @@ import { toolError } from './_error.js';
 import type { AffinityOrganization } from '../affinity/types.js';
 
 function formatOrg(o: AffinityOrganization): string {
-  const domain = o.domain ?? o.domains[0] ?? 'no domain';
+  const domain = o.domain ?? o.domains?.[0] ?? 'no domain';
   const dates = o.interaction_dates;
   const lastContact = dates?.last_interaction_date
     ? `Last contact: ${dates.last_interaction_date}`
@@ -51,8 +51,8 @@ export function registerOrganizationTools(server: McpServer, api: OrganizationsA
     async ({ org_id }) => {
       try {
       const org = await api.getById(org_id);
-      const domains = org.domains.join(', ') || 'none';
-      const people = org.person_ids.length ? org.person_ids.join(', ') : 'none';
+      const domains = org.domains?.join(', ') || 'none';
+      const people = org.person_ids?.length ? org.person_ids.join(', ') : 'none';
       const dates = org.interaction_dates;
 
       const text = [

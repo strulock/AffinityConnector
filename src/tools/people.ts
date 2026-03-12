@@ -8,7 +8,7 @@ import type { AffinityPerson } from '../affinity/types.js';
 
 function formatPerson(p: AffinityPerson): string {
   const name = [p.first_name, p.last_name].filter(Boolean).join(' ') || '(no name)';
-  const email = p.primary_email ?? p.emails[0] ?? 'no email';
+  const email = p.primary_email ?? p.emails?.[0] ?? 'no email';
   const dates = p.interaction_dates;
   const lastContact = dates?.last_interaction_date
     ? `Last contact: ${dates.last_interaction_date}`
@@ -51,8 +51,8 @@ export function registerPeopleTools(server: McpServer, api: PeopleApi): void {
       try {
       const person = await api.getById(person_id);
       const name = [person.first_name, person.last_name].filter(Boolean).join(' ');
-      const emails = person.emails.join(', ') || 'none';
-      const orgs = person.organization_ids.length
+      const emails = person.emails?.join(', ') || 'none';
+      const orgs = person.organization_ids?.length
         ? person.organization_ids.join(', ')
         : 'none';
       const dates = person.interaction_dates;

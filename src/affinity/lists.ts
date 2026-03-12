@@ -13,7 +13,8 @@ export class ListsApi {
     const cached = await this.client.cache.get<AffinityList[]>(cacheKey);
     if (cached) return cached;
 
-    const lists = await this.client.get<AffinityList[]>('/lists');
+    const raw = await this.client.get<AffinityList[]>('/lists');
+    const lists = Array.isArray(raw) ? raw : [];
     await this.client.cache.set(cacheKey, lists, CACHE_TTL.list);
     return lists;
   }
@@ -51,9 +52,10 @@ export class ListsApi {
     const cached = await this.client.cache.get<AffinityFieldValue[]>(cacheKey);
     if (cached) return cached;
 
-    const values = await this.client.get<AffinityFieldValue[]>('/field-values', {
+    const raw = await this.client.get<AffinityFieldValue[]>('/field-values', {
       list_entry_id: listEntryId,
     });
+    const values = Array.isArray(raw) ? raw : [];
     await this.client.cache.set(cacheKey, values, CACHE_TTL.listEntries);
     return values;
   }

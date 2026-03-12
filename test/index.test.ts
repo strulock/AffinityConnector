@@ -232,6 +232,34 @@ describe('POST /mcp — Cloudflare Access JWT validation', () => {
     );
   });
 
+  it('returns 500 when JWT validation enabled but AUD is missing', async () => {
+    const env = {
+      AFFINITY_API_KEY: 'real-key',
+      AFFINITY_CACHE: undefined,
+      CLOUDFLARE_ACCESS_JWT_VALIDATION: true,
+      CLOUDFLARE_ACCESS_AUD: undefined,
+      CLOUDFLARE_ACCESS_TEAM_DOMAIN: 'test.cloudflareaccess.com',
+    };
+    const res = await worker.fetch(makeRequest('POST', '/mcp'), env, {} as never);
+    expect(res.status).toBe(500);
+    const text = await res.text();
+    expect(text).toContain('CLOUDFLARE_ACCESS_AUD');
+  });
+
+  it('returns 500 when JWT validation enabled but TEAM_DOMAIN is missing', async () => {
+    const env = {
+      AFFINITY_API_KEY: 'real-key',
+      AFFINITY_CACHE: undefined,
+      CLOUDFLARE_ACCESS_JWT_VALIDATION: true,
+      CLOUDFLARE_ACCESS_AUD: 'test-aud',
+      CLOUDFLARE_ACCESS_TEAM_DOMAIN: undefined,
+    };
+    const res = await worker.fetch(makeRequest('POST', '/mcp'), env, {} as never);
+    expect(res.status).toBe(500);
+    const text = await res.text();
+    expect(text).toContain('CLOUDFLARE_ACCESS_TEAM_DOMAIN');
+  });
+
   it('returns 401 with CORS headers so the browser gets a readable error', async () => {
     const res = await worker.fetch(makeRequest('POST', '/mcp'), makeEnvWithAccess(), {} as never);
     expect(res.status).toBe(401);

@@ -12,7 +12,9 @@
       "mcp__claude_ai_Cloudflare_Developer_Platform__set_active_account",
       "mcp__claude_ai_Cloudflare_Developer_Platform__kv_namespace_create",
       "Bash(npm install:*)",
-      "Bash(npx vitest:*)"
+      "Bash(npx vitest:*)",
+      "Bash(npm test:*)",
+      "Bash(git add:*)"
     ]
   }
 }
