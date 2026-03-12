@@ -47,6 +47,21 @@ export class OrganizationsApi {
     return org;
   }
 
+  /**
+   * Delete an organization record by ID (v1 DELETE /organizations/{id}).
+   * Clears the org's cache entry and invalidates search cache.
+   * This is permanent and cannot be undone.
+   */
+  async delete(orgId: number): Promise<void> {
+    await this.client.del<{ success: boolean }>(`/organizations/${orgId}`);
+    await this.client.cache.delete(`orgs:${orgId}`);
+    await this.client.cache.deleteWithPrefix('orgs:search:');
+  }
+
+  /**
+   * Fetch a single organization by ID, including interaction dates.
+   * Result is cached for 5 minutes (CACHE_TTL.profile).
+   */
   async getById(orgId: number): Promise<AffinityOrganization> {
     const cacheKey = `orgs:${orgId}`;
     const cached = await this.client.cache.get<AffinityOrganization>(cacheKey);

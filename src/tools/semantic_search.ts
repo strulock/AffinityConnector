@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { SemanticSearchApi } from '../affinity/semantic_search.js';
+import { toolError } from './_error.js';
 import type { AffinitySemanticResult } from '../affinity/types.js';
 
 function formatResult(r: AffinitySemanticResult): string {
@@ -20,14 +21,16 @@ export function registerSemanticSearchTools(server: McpServer, api: SemanticSear
       page_token: z.string().optional().describe('Pagination token from a previous call'),
     },
     async ({ query, limit, page_token }) => {
-      const { results, nextPageToken } = await api.search(query, { limit, page_token });
-      if (results.length === 0) {
-        return { content: [{ type: 'text', text: 'No results found.' }] };
-      }
-      const lines = results.map(formatResult);
-      let text = `${results.length} result(s) for "${query}":\n\n${lines.join('\n')}`;
-      if (nextPageToken) text += `\n\nMore available. Use page_token: "${nextPageToken}"`;
-      return { content: [{ type: 'text', text }] };
+      try {
+        const { results, nextPageToken } = await api.search(query, { limit, page_token });
+        if (results.length === 0) {
+          return { content: [{ type: 'text', text: 'No results found.' }] };
+        }
+        const lines = results.map(formatResult);
+        let text = `${results.length} result(s) for "${query}":\n\n${lines.join('\n')}`;
+        if (nextPageToken) text += `\n\nMore available. Use page_token: "${nextPageToken}"`;
+        return { content: [{ type: 'text', text }] };
+      } catch (e) { return toolError(e); }
     }
   );
 }

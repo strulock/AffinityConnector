@@ -115,9 +115,11 @@ export class ListsApi {
    * Efficient for aggregation — single request instead of per-entry fetches.
    */
   async getFieldValuesByList(listId: number, fieldId: number): Promise<AffinityFieldValue[]> {
+    // Cap at 500 to avoid unbounded memory/timeout on large lists.
     const values = await this.client.get<AffinityFieldValue[]>('/field-values', {
       list_id: listId,
       field_id: fieldId,
+      page_size: 500,
     });
     return Array.isArray(values) ? values : [];
   }

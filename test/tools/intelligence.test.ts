@@ -140,6 +140,53 @@ describe('find_intro_path tool', () => {
     // Falls back to "Person {id}"
     expect(result.content[0].text).toContain('Person 2');
   });
+
+  it('returns friendly message when target person is not found', async () => {
+    vi.unstubAllGlobals();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 404 })));
+    const client = new AffinityClient('key');
+    const { server, callTool } = makeMockServer();
+    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client));
+    const result = await callTool('find_intro_path', { person_id: 999 });
+    expect(result.content[0].text).toContain('not found');
+    expect(result.content[0].text).toContain('999');
+  });
+
+  it('surfaces skipped org count when an org fetch fails', async () => {
+    const personTwoOrgs = { ...MOCK_PERSON, organization_ids: [10, 11] };
+    let call = 0;
+    vi.unstubAllGlobals();
+    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => {
+      call++;
+      if (call === 1) return Promise.resolve(new Response(JSON.stringify(personTwoOrgs), { status: 200 }));
+      if (call === 2) return Promise.resolve(new Response(JSON.stringify(MOCK_ORG), { status: 200 })); // org 10 ok
+      if (call === 3) return Promise.resolve(new Response('{}', { status: 404 }));                     // org 11 fails
+      if (call === 4) return Promise.resolve(new Response(JSON.stringify({ ...MOCK_STRENGTH, entity_id: 2, strength: 70 }), { status: 200 }));
+      if (call === 5) return Promise.resolve(new Response(JSON.stringify({ ...MOCK_STRENGTH, entity_id: 3, strength: 50 }), { status: 200 }));
+      return Promise.resolve(new Response(JSON.stringify(call === 6 ? PERSON_2 : PERSON_3), { status: 200 }));
+    }));
+    const client = new AffinityClient('key');
+    const { server, callTool } = makeMockServer();
+    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client));
+    const result = await callTool('find_intro_path', { person_id: 1 });
+    const text = result.content[0].text;
+    expect(text).toContain('Bob Jones');
+    expect(text).toContain('1 organization(s) could not be fetched');
+  });
+
+  it('returns single best introducer when only one connector exists', async () => {
+    const orgOneConnector = { ...MOCK_ORG, person_ids: [1, 2] };
+    const { callTool } = setupTools([
+      MOCK_PERSON,
+      orgOneConnector,
+      { ...MOCK_STRENGTH, entity_id: 2, strength: 60 },
+      PERSON_2,
+    ]);
+    const result = await callTool('find_intro_path', { person_id: 1 });
+    const text = result.content[0].text;
+    expect(text).toContain('Bob Jones');
+    expect(text).toContain('60/100');
+  });
 });
 
 describe('summarize_relationship tool', () => {

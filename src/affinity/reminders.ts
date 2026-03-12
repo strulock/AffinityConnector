@@ -1,7 +1,7 @@
 // Affinity v1 reminders endpoints: /reminders
 
 import { AffinityClient } from './client.js';
-import { CACHE_TTL } from '../cache.js';
+import { CACHE_TTL, stableKey } from '../cache.js';
 import type { AffinityReminder } from './types.js';
 
 export class RemindersApi {
@@ -16,14 +16,14 @@ export class RemindersApi {
     organization_id?: number;
     opportunity_id?: number;
   } = {}): Promise<AffinityReminder[]> {
-    const cacheKey = `reminders:${JSON.stringify(params)}`;
+    const cacheKey = stableKey('reminders', params as Record<string, unknown>);
     const cached = await this.client.cache.get<AffinityReminder[]>(cacheKey);
     if (cached) return cached;
 
-    const reminders = await this.client.get<AffinityReminder[]>('/reminders', params);
-    const result = Array.isArray(reminders) ? reminders : [];
-    await this.client.cache.set(cacheKey, result, CACHE_TTL.reminders);
-    return result;
+    const raw = await this.client.get<AffinityReminder[]>('/reminders', params);
+    const reminders = Array.isArray(raw) ? raw : [];
+    await this.client.cache.set(cacheKey, reminders, CACHE_TTL.reminders);
+    return reminders;
   }
 
   /**

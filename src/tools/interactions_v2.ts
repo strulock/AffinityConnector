@@ -3,6 +3,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { InteractionsV2Api } from '../affinity/interactions_v2.js';
+import { toolError } from './_error.js';
 import type {
   AffinityEmailV2,
   AffinityCallV2,
@@ -30,8 +31,8 @@ function formatChatMessage(msg: AffinityChatMessageV2): string {
 }
 
 const COMMON_PARAMS = {
-  person_id: z.number().int().optional().describe('Filter by person ID'),
-  organization_id: z.number().int().optional().describe('Filter by organization ID'),
+  person_id: z.number().int().min(1).optional().describe('Filter by person ID'),
+  organization_id: z.number().int().min(1).optional().describe('Filter by organization ID'),
   created_after: z.string().optional().describe('ISO 8601 timestamp — only return items created after this date'),
   created_before: z.string().optional().describe('ISO 8601 timestamp — only return items created before this date'),
   limit: z.number().int().min(1).max(100).default(25).describe('Max items to return'),
@@ -44,16 +45,18 @@ export function registerInteractionsV2Tools(server: McpServer, api: Interactions
     'Get email interaction history from Affinity (v2). Richer than get_interactions — filter by person, org, or date range.',
     COMMON_PARAMS,
     async ({ person_id, organization_id, created_after, created_before, limit, page_token }) => {
-      const { emails, nextPageToken } = await api.getEmails({
-        person_id, organization_id, created_after, created_before, limit, page_token,
-      });
-      if (emails.length === 0) {
-        return { content: [{ type: 'text', text: 'No emails found.' }] };
-      }
-      const lines = emails.map(formatEmail);
-      let text = `${emails.length} email(s):\n\n${lines.join('\n')}`;
-      if (nextPageToken) text += `\n\nMore available. Use page_token: "${nextPageToken}"`;
-      return { content: [{ type: 'text', text }] };
+      try {
+        const { emails, nextPageToken } = await api.getEmails({
+          person_id, organization_id, created_after, created_before, limit, page_token,
+        });
+        if (emails.length === 0) {
+          return { content: [{ type: 'text', text: 'No emails found.' }] };
+        }
+        const lines = emails.map(formatEmail);
+        let text = `${emails.length} email(s):\n\n${lines.join('\n')}`;
+        if (nextPageToken) text += `\n\nMore available. Use page_token: "${nextPageToken}"`;
+        return { content: [{ type: 'text', text }] };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -62,16 +65,18 @@ export function registerInteractionsV2Tools(server: McpServer, api: Interactions
     'Get call history from Affinity (v2). Calls are only available via the v2 API.',
     COMMON_PARAMS,
     async ({ person_id, organization_id, created_after, created_before, limit, page_token }) => {
-      const { calls, nextPageToken } = await api.getCalls({
-        person_id, organization_id, created_after, created_before, limit, page_token,
-      });
-      if (calls.length === 0) {
-        return { content: [{ type: 'text', text: 'No calls found.' }] };
-      }
-      const lines = calls.map(formatCall);
-      let text = `${calls.length} call(s):\n\n${lines.join('\n')}`;
-      if (nextPageToken) text += `\n\nMore available. Use page_token: "${nextPageToken}"`;
-      return { content: [{ type: 'text', text }] };
+      try {
+        const { calls, nextPageToken } = await api.getCalls({
+          person_id, organization_id, created_after, created_before, limit, page_token,
+        });
+        if (calls.length === 0) {
+          return { content: [{ type: 'text', text: 'No calls found.' }] };
+        }
+        const lines = calls.map(formatCall);
+        let text = `${calls.length} call(s):\n\n${lines.join('\n')}`;
+        if (nextPageToken) text += `\n\nMore available. Use page_token: "${nextPageToken}"`;
+        return { content: [{ type: 'text', text }] };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -80,16 +85,18 @@ export function registerInteractionsV2Tools(server: McpServer, api: Interactions
     'Get meeting history from Affinity (v2). Returns richer metadata than the v1 get_interactions tool.',
     COMMON_PARAMS,
     async ({ person_id, organization_id, created_after, created_before, limit, page_token }) => {
-      const { meetings, nextPageToken } = await api.getMeetings({
-        person_id, organization_id, created_after, created_before, limit, page_token,
-      });
-      if (meetings.length === 0) {
-        return { content: [{ type: 'text', text: 'No meetings found.' }] };
-      }
-      const lines = meetings.map(formatMeeting);
-      let text = `${meetings.length} meeting(s):\n\n${lines.join('\n')}`;
-      if (nextPageToken) text += `\n\nMore available. Use page_token: "${nextPageToken}"`;
-      return { content: [{ type: 'text', text }] };
+      try {
+        const { meetings, nextPageToken } = await api.getMeetings({
+          person_id, organization_id, created_after, created_before, limit, page_token,
+        });
+        if (meetings.length === 0) {
+          return { content: [{ type: 'text', text: 'No meetings found.' }] };
+        }
+        const lines = meetings.map(formatMeeting);
+        let text = `${meetings.length} meeting(s):\n\n${lines.join('\n')}`;
+        if (nextPageToken) text += `\n\nMore available. Use page_token: "${nextPageToken}"`;
+        return { content: [{ type: 'text', text }] };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -98,16 +105,18 @@ export function registerInteractionsV2Tools(server: McpServer, api: Interactions
     'Get Slack/chat message history from Affinity (v2). Chat messages are only available via the v2 API.',
     COMMON_PARAMS,
     async ({ person_id, organization_id, created_after, created_before, limit, page_token }) => {
-      const { messages, nextPageToken } = await api.getChatMessages({
-        person_id, organization_id, created_after, created_before, limit, page_token,
-      });
-      if (messages.length === 0) {
-        return { content: [{ type: 'text', text: 'No chat messages found.' }] };
-      }
-      const lines = messages.map(formatChatMessage);
-      let text = `${messages.length} chat message(s):\n\n${lines.join('\n')}`;
-      if (nextPageToken) text += `\n\nMore available. Use page_token: "${nextPageToken}"`;
-      return { content: [{ type: 'text', text }] };
+      try {
+        const { messages, nextPageToken } = await api.getChatMessages({
+          person_id, organization_id, created_after, created_before, limit, page_token,
+        });
+        if (messages.length === 0) {
+          return { content: [{ type: 'text', text: 'No chat messages found.' }] };
+        }
+        const lines = messages.map(formatChatMessage);
+        let text = `${messages.length} chat message(s):\n\n${lines.join('\n')}`;
+        if (nextPageToken) text += `\n\nMore available. Use page_token: "${nextPageToken}"`;
+        return { content: [{ type: 'text', text }] };
+      } catch (e) { return toolError(e); }
     }
   );
 }

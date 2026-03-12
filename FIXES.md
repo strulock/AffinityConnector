@@ -4,7 +4,79 @@ Issues identified during codebase review (2026-03-08). Ordered by priority.
 
 ---
 
-## Fix 1 — Cache Key Ordering Bug (HIGH)
+## Phased Action Plan
+
+### Phase 1 — Quick Wins ✅ COMPLETE (2026-03-08)
+Goal: eliminate the most dangerous bugs with minimal effort.
+
+| # | Fix | Files | Status |
+|---|-----|-------|--------|
+| 2 | Remove `?? 0` fallbacks in `set_field_value` | `src/tools/lists.ts` | ✅ Done |
+| 6 | Add date format regex to `due_date` Zod schema | `src/tools/reminders.ts` | ✅ Done |
+| 7 | Add JSDoc to `AffinitySearchResult<T>` | `src/affinity/types.ts` | ✅ Done |
+| 9 | Add clarifying comment to `as unknown as T` cast | `src/affinity/client.ts` | ✅ Done |
+
+**Completion gate:** all existing tests still pass. ✅ 476/476 tests passing.
+
+---
+
+### Phase 2 — Cache Correctness ✅ COMPLETE (2026-03-08)
+Goal: fix cache key ordering and standardize the format across the codebase in one pass.
+
+| # | Fix | Files | Status |
+|---|-----|-------|--------|
+| 1 | Introduce `stableKey()` helper, replace `JSON.stringify` cache keys | `src/affinity/notes.ts`, `src/affinity/reminders.ts` | ✅ Done |
+| 8 | Document convention in `cache.ts`; lists/people/orgs keys are positional scalars — already deterministic, no change needed | `src/cache.ts` | ✅ Done |
+
+**Completion gate:** add cache-ordering tests to `notes.test.ts` and `reminders.test.ts` (same params, different key order → single fetch call). ✅ 478/478 tests passing.
+
+---
+
+### Phase 3 — Error Handling Hardening ✅ COMPLETE (2026-03-08)
+Goal: prevent silent or crashing failures from propagating to users.
+
+| # | Fix | Files | Status |
+|---|-----|-------|--------|
+| 4 | Wrap merge poll loop in try-catch; handle `null` return in callers | `src/tools/merges.ts` | ✅ Done |
+| 5 | Track skipped orgs in `find_intro_path`; surface count in response | `src/tools/intelligence.ts` | ✅ Done |
+
+**Completion gate:** add test to `merges.test.ts` confirming graceful message when `getMergeTaskStatus` throws. ✅ 479/479 tests passing.
+
+---
+
+### Phase 4 — Test Coverage ✅ COMPLETE (2026-03-08)
+Goal: bring `find_intro_path` — the highest-risk untested code — under test.
+
+| # | Fix | Files | Status |
+|---|-----|-------|--------|
+| 3 | Add 6 test cases for `find_intro_path` using mock API pattern | `test/tools/intelligence.test.ts` | ✅ Done |
+
+Test cases (3 pre-existing + 3 added):
+1. ✅ Happy path — shared org members, ranked intro list returned
+2. ✅ Target person not found — friendly message returned (also added `AffinityNotFoundError` catch in `find_intro_path`)
+3. ✅ Target has no org associations
+4. ✅ Org fetch fails silently — result returned with skipped org count note (validates Fix 5)
+5. ✅ No shared contacts — orgs have no members besides the target
+6. ✅ Single best introducer match
+
+**Completion gate:** all 6 cases pass; no new test skips. ✅ 482/482 tests passing.
+
+---
+
+### Summary
+
+| Phase | Fixes | Status |
+|-------|-------|--------|
+| 1 — Quick wins | 2, 6, 7, 9 | ✅ Complete (476/476 tests passing) |
+| 2 — Cache correctness | 1, 8 | ✅ Complete (478/478 tests passing) |
+| 3 — Error handling | 4, 5 | ✅ Complete (479/479 tests passing) |
+| 4 — Test coverage | 3 | ✅ Complete (482/482 tests passing) |
+
+Phase 3 should come before Phase 4 so the intelligence error-handling tests (Fix 5 case #4) can validate the Fix 5 behavior.
+
+---
+
+## Fix 1 — Cache Key Ordering Bug (HIGH) ✅ DONE
 
 **Files:** `src/affinity/notes.ts`, `src/affinity/reminders.ts`
 
@@ -36,7 +108,7 @@ function stableKey(prefix: string, params: Record<string, unknown>): string {
 
 ---
 
-## Fix 2 — Silent `?? 0` Fallback in `set_field_value` Tool (HIGH)
+## Fix 2 — Silent `?? 0` Fallback in `set_field_value` Tool (HIGH) ✅ DONE
 
 **File:** `src/tools/lists.ts:152-158`
 
@@ -88,7 +160,7 @@ if (field_value_id != null) {
 
 ---
 
-## Fix 3 — `find_intro_path` Has Zero Test Coverage (HIGH)
+## Fix 3 — `find_intro_path` Has Zero Test Coverage (HIGH) ✅ DONE
 
 **File:** `src/tools/intelligence.ts` (approximately lines 56–147)
 
@@ -109,7 +181,7 @@ Use the existing mock API pattern from the file (mock `PeopleApi`, `Organization
 
 ---
 
-## Fix 4 — Merge Poll Loop Has No Error Handling (MEDIUM)
+## Fix 4 — Merge Poll Loop Has No Error Handling (MEDIUM) ✅ DONE
 
 **File:** `src/tools/merges.ts:13–27`
 
@@ -164,7 +236,7 @@ Update callers to handle `null` return by returning a user-friendly "merge initi
 
 ---
 
-## Fix 5 — Silent Error Swallowing in Intelligence Tool (MEDIUM)
+## Fix 5 — Silent Error Swallowing in Intelligence Tool (MEDIUM) ✅ DONE
 
 **File:** `src/tools/intelligence.ts` (find_intro_path), `src/affinity/intelligence.ts`
 
@@ -200,7 +272,7 @@ Covered by Fix 3 test case #4.
 
 ---
 
-## Fix 6 — No Date Format Validation on `due_date` in Reminders (MEDIUM)
+## Fix 6 — No Date Format Validation on `due_date` in Reminders (MEDIUM) ✅ DONE
 
 **File:** `src/tools/reminders.ts:44`
 
@@ -223,7 +295,7 @@ Also apply to `update_reminder`'s `due_date` field.
 
 ---
 
-## Fix 7 — Add Type Documentation to `AffinitySearchResult` (LOW)
+## Fix 7 — Add Type Documentation to `AffinitySearchResult` (LOW) ✅ DONE
 
 **File:** `src/affinity/types.ts:60–64`
 
@@ -256,7 +328,7 @@ export interface AffinitySearchResult<T> {
 
 ---
 
-## Fix 8 — Standardize Cache Key Format Across API Classes (LOW)
+## Fix 8 — Standardize Cache Key Format Across API Classes (LOW) ✅ DONE
 
 **Files:** `src/affinity/notes.ts`, `src/affinity/reminders.ts` (after Fix 1), `src/affinity/lists.ts`, `src/affinity/people.ts`, `src/affinity/organizations.ts`
 
@@ -280,7 +352,7 @@ No behaviour change — this is a consistency/maintainability fix.
 
 ---
 
-## Fix 9 — Remove Dangerous `as unknown as T` Cast in Client (LOW)
+## Fix 9 — Remove Dangerous `as unknown as T` Cast in Client (LOW) ✅ DONE
 
 **File:** `src/affinity/client.ts` (204 No Content handling)
 
@@ -307,19 +379,17 @@ Option B is acceptable given the existing call sites are all correct. At minimum
 
 ## Implementation Order
 
-| # | Fix | Priority | Effort | Files Changed |
-|---|-----|----------|--------|---------------|
-| 1 | Cache key ordering | HIGH | Small | notes.ts, reminders.ts + tests |
-| 2 | `?? 0` fallback removal | HIGH | Trivial | lists.ts + tests |
-| 3 | find_intro_path tests | HIGH | Medium | intelligence.test.ts |
-| 4 | Merge poll error handling | MEDIUM | Small | merges.ts + tests |
-| 5 | Intelligence silent failures | MEDIUM | Small | intelligence.ts |
-| 6 | Date format validation | MEDIUM | Trivial | reminders.ts + tests |
-| 7 | AffinitySearchResult JSDoc | LOW | Trivial | types.ts |
-| 8 | Standardize cache keys | LOW | Small | notes.ts, reminders.ts (after Fix 1) |
-| 9 | `as unknown as T` cast | LOW | Trivial | client.ts |
-
-**Estimated total:** ~4–6 hours of focused implementation work.
+| # | Fix | Priority | Effort | Files Changed | Status |
+|---|-----|----------|--------|---------------|--------|
+| 1 | Cache key ordering | HIGH | Small | notes.ts, reminders.ts + tests | ✅ Done |
+| 2 | `?? 0` fallback removal | HIGH | Trivial | lists.ts + tests | ✅ Done |
+| 3 | find_intro_path tests | HIGH | Medium | intelligence.test.ts | ✅ Done |
+| 4 | Merge poll error handling | MEDIUM | Small | merges.ts + tests | ✅ Done |
+| 5 | Intelligence silent failures | MEDIUM | Small | intelligence.ts | ✅ Done |
+| 6 | Date format validation | MEDIUM | Trivial | reminders.ts + tests | ✅ Done |
+| 7 | AffinitySearchResult JSDoc | LOW | Trivial | types.ts | ✅ Done |
+| 8 | Standardize cache keys | LOW | Small | notes.ts, reminders.ts (after Fix 1) | ✅ Done |
+| 9 | `as unknown as T` cast | LOW | Trivial | client.ts | ✅ Done |
 
 ---
 

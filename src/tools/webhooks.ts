@@ -6,6 +6,7 @@ import { WebhooksApi } from '../affinity/webhooks.js';
 import { KVCache } from '../cache.js';
 import { PeopleApi } from '../affinity/people.js';
 import { OrganizationsApi } from '../affinity/organizations.js';
+import { toolError } from './_error.js';
 import type { AffinityWebhookSubscription, AffinityWebhookEvent } from '../affinity/types.js';
 
 const WEBHOOK_RECENT_KEY = 'webhook:recent';
@@ -27,14 +28,16 @@ export function registerWebhookTools(
     'List all Affinity webhook subscriptions registered for this workspace, including their IDs, target URLs, event types, and active/inactive state.',
     {},
     async () => {
-      const webhooks = await api.listWebhooks();
-      if (webhooks.length === 0) {
-        return { content: [{ type: 'text', text: 'No webhook subscriptions found.' }] };
-      }
-      const lines = webhooks.map(formatWebhook);
-      return {
-        content: [{ type: 'text', text: `${webhooks.length} webhook(s):\n\n${lines.join('\n\n')}` }],
-      };
+      try {
+        const webhooks = await api.listWebhooks();
+        if (webhooks.length === 0) {
+          return { content: [{ type: 'text', text: 'No webhook subscriptions found.' }] };
+        }
+        const lines = webhooks.map(formatWebhook);
+        return {
+          content: [{ type: 'text', text: `${webhooks.length} webhook(s):\n\n${lines.join('\n\n')}` }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -42,18 +45,20 @@ export function registerWebhookTools(
     'create_webhook',
     'Register a new Affinity webhook subscription. Available event types: person.created, person.updated, organization.created, organization.updated, note.created, field_value.created, field_value.updated, field_value.deleted, list_entry.created, list_entry.deleted. The target URL defaults to https://affinity.trulock.com/webhook.',
     {
-      subscriptions: z.array(z.string()).describe('Event types to subscribe to (e.g. ["person.created", "note.created"])'),
-      webhook_url: z.string().optional().describe(`Target URL to receive events (defaults to ${DEFAULT_WEBHOOK_URL})`),
+      subscriptions: z.array(z.string()).min(1).describe('Event types to subscribe to (e.g. ["person.created", "note.created"])'),
+      webhook_url: z.string().url().refine(u => u.startsWith('https://'), { message: 'webhook_url must be an https:// URL' }).optional().describe(`Target URL to receive events (defaults to ${DEFAULT_WEBHOOK_URL})`),
     },
     async ({ subscriptions, webhook_url }) => {
-      const url = webhook_url ?? DEFAULT_WEBHOOK_URL;
-      const webhook = await api.createWebhook({ webhook_url: url, subscriptions });
-      return {
-        content: [{
-          type: 'text',
-          text: `Created webhook [id:${webhook.id}] (${webhook.state}) → ${webhook.webhook_url}\nEvents: ${webhook.subscriptions.join(', ')}`,
-        }],
-      };
+      try {
+        const url = webhook_url ?? DEFAULT_WEBHOOK_URL;
+        const webhook = await api.createWebhook({ webhook_url: url, subscriptions });
+        return {
+          content: [{
+            type: 'text',
+            text: `Created webhook [id:${webhook.id}] (${webhook.state}) → ${webhook.webhook_url}\nEvents: ${webhook.subscriptions.join(', ')}`,
+          }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -61,8 +66,8 @@ export function registerWebhookTools(
     'update_webhook',
     'Update an Affinity webhook subscription. Change the target URL, event list, or toggle active/inactive.',
     {
-      webhook_id: z.number().int().describe('Webhook subscription ID (from list_webhooks)'),
-      webhook_url: z.string().optional().describe('New target URL'),
+      webhook_id: z.number().int().min(1).describe('Webhook subscription ID (from list_webhooks)'),
+      webhook_url: z.string().url().refine(u => u.startsWith('https://'), { message: 'webhook_url must be an https:// URL' }).optional().describe('New target URL'),
       subscriptions: z.array(z.string()).optional().describe('New event types list (replaces the existing list)'),
       state: z.enum(['active', 'inactive']).optional().describe('Set to "inactive" to pause delivery'),
     },
@@ -72,13 +77,15 @@ export function registerWebhookTools(
           content: [{ type: 'text', text: 'Provide at least one field to update.' }],
         };
       }
-      const webhook = await api.updateWebhook(webhook_id, { webhook_url, subscriptions, state });
-      return {
-        content: [{
-          type: 'text',
-          text: `Updated webhook [id:${webhook.id}] (${webhook.state}) → ${webhook.webhook_url}`,
-        }],
-      };
+      try {
+        const webhook = await api.updateWebhook(webhook_id, { webhook_url, subscriptions, state });
+        return {
+          content: [{
+            type: 'text',
+            text: `Updated webhook [id:${webhook.id}] (${webhook.state}) → ${webhook.webhook_url}`,
+          }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -86,22 +93,24 @@ export function registerWebhookTools(
     'delete_webhook',
     'Delete an Affinity webhook subscription by ID. Use list_webhooks to find webhook IDs.',
     {
-      webhook_id: z.number().int().describe('Webhook subscription ID to delete (from list_webhooks)'),
+      webhook_id: z.number().int().min(1).describe('Webhook subscription ID to delete (from list_webhooks)'),
     },
     async ({ webhook_id }) => {
-      await api.deleteWebhook(webhook_id);
-      return {
-        content: [{ type: 'text', text: `Webhook ${webhook_id} deleted successfully.` }],
-      };
+      try {
+        await api.deleteWebhook(webhook_id);
+        return {
+          content: [{ type: 'text', text: `Webhook ${webhook_id} deleted successfully.` }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 
   server.tool(
     'get_recent_events',
-    'Get recent Affinity webhook events received by this Worker. Optionally filter by event_type (e.g. "person.created") or entity_id. Use enrich=true to append the current entity name to each event (capped at 5 enrichments). Returns events newest-first.',
+    'Get recent Affinity webhook events received by this Worker. Stores the most recent 100 events — older events are not available. Optionally filter by event_type (e.g. "person.created") or entity_id. Use enrich=true to append the current entity name to each event (enrichment capped at 5 events). Returns events newest-first.',
     {
       event_type: z.string().optional().describe('Filter to a specific event type (e.g. "person.created")'),
-      entity_id: z.number().int().optional().describe('Filter to events involving a specific entity ID'),
+      entity_id: z.number().int().min(1).optional().describe('Filter to events involving a specific entity ID'),
       limit: z.number().int().min(1).max(100).optional().describe('Maximum number of events to return (default 20)'),
       enrich: z.boolean().optional().describe('Fetch and append the current entity name for each event (max 5, default false)'),
     },
@@ -111,16 +120,15 @@ export function registerWebhookTools(
         return { content: [{ type: 'text', text: 'No webhook events received yet.' }] };
       }
 
-      const events: AffinityWebhookEvent[] = [];
-      for (const id of recentIds) {
-        const event = await cache.get<AffinityWebhookEvent>(`webhook:event:${id}`);
-        if (event) events.push(event);
-      }
+      const maybeEvents = await Promise.all(
+        recentIds.map(id => cache.get<AffinityWebhookEvent>(`webhook:event:${id}`))
+      );
+      const events = maybeEvents.filter((e): e is AffinityWebhookEvent => e !== null);
 
       let filtered = events;
       if (event_type) filtered = filtered.filter(e => e.type === event_type);
       if (entity_id !== undefined) {
-        filtered = filtered.filter(e => e.body.id === entity_id || e.body.entity_id === entity_id);
+        filtered = filtered.filter(e => Number(e.body.id) === entity_id || Number(e.body.entity_id) === entity_id);
       }
 
       const limited = filtered.slice(0, limit);

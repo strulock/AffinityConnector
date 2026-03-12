@@ -20,9 +20,9 @@ export function registerNotesTools(server: McpServer, api: NotesApi): void {
     'get_notes',
     'Get notes attached to a person or organization in Affinity.',
     {
-      person_id: z.number().int().optional().describe('Filter notes by person ID'),
-      organization_id: z.number().int().optional().describe('Filter notes by organization ID'),
-      opportunity_id: z.number().int().optional().describe('Filter notes by opportunity ID'),
+      person_id: z.number().int().min(1).optional().describe('Filter notes by person ID'),
+      organization_id: z.number().int().min(1).optional().describe('Filter notes by organization ID'),
+      opportunity_id: z.number().int().min(1).optional().describe('Filter notes by opportunity ID'),
       limit: z.number().int().min(1).max(100).default(25).describe('Max notes to return'),
       page_token: z.string().optional().describe('Pagination token from a previous call'),
     },
@@ -77,22 +77,24 @@ export function registerNotesTools(server: McpServer, api: NotesApi): void {
     'get_note_replies',
     'Fetch the reply thread for a specific Affinity note. Note: the v2 API excludes replies from the main notes list — use this tool to retrieve them separately.',
     {
-      note_id: z.number().int().describe('Note ID to fetch replies for (from get_notes results)'),
+      note_id: z.number().int().min(1).describe('Note ID to fetch replies for (from get_notes results)'),
       limit: z.number().int().min(1).max(100).default(25).describe('Max replies to return'),
       page_token: z.string().optional().describe('Pagination token from a previous call'),
     },
     async ({ note_id, limit, page_token }) => {
-      const { replies, nextPageToken } = await api.getNoteReplies(note_id, { limit, page_token });
-      if (replies.length === 0) {
-        return { content: [{ type: 'text', text: `No replies found for note ${note_id}.` }] };
-      }
-      const lines = replies.map(r => {
-        const date = new Date(r.created_at).toLocaleDateString();
-        return `[reply:${r.id}] ${date} (by user ${r.creator_id})\n${r.content}`;
-      });
-      let text = `${replies.length} reply/replies for note ${note_id}:\n\n${lines.join('\n\n')}`;
-      if (nextPageToken) text += `\n\nMore available. Use page_token: "${nextPageToken}"`;
-      return { content: [{ type: 'text', text }] };
+      try {
+        const { replies, nextPageToken } = await api.getNoteReplies(note_id, { limit, page_token });
+        if (replies.length === 0) {
+          return { content: [{ type: 'text', text: `No replies found for note ${note_id}.` }] };
+        }
+        const lines = replies.map(r => {
+          const date = new Date(r.created_at).toLocaleDateString();
+          return `[reply:${r.id}] ${date} (by user ${r.creator_id})\n${r.content}`;
+        });
+        let text = `${replies.length} reply/replies for note ${note_id}:\n\n${lines.join('\n\n')}`;
+        if (nextPageToken) text += `\n\nMore available. Use page_token: "${nextPageToken}"`;
+        return { content: [{ type: 'text', text }] };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -100,7 +102,7 @@ export function registerNotesTools(server: McpServer, api: NotesApi): void {
     'update_note',
     'Update the content of an existing Affinity note by its ID.',
     {
-      note_id: z.number().int().describe('Note ID to update (from get_notes results)'),
+      note_id: z.number().int().min(1).describe('Note ID to update (from get_notes results)'),
       content: z.string().min(1).describe('New note content (replaces existing content)'),
     },
     async ({ note_id, content }) => {
@@ -117,7 +119,7 @@ export function registerNotesTools(server: McpServer, api: NotesApi): void {
     'delete_note',
     'Delete an Affinity note by its ID. This is permanent and cannot be undone.',
     {
-      note_id: z.number().int().describe('Note ID to delete (from get_notes results)'),
+      note_id: z.number().int().min(1).describe('Note ID to delete (from get_notes results)'),
     },
     async ({ note_id }) => {
       try {

@@ -19,7 +19,7 @@ function formatPerson(p: AffinityPerson): string {
 export function registerPeopleTools(server: McpServer, api: PeopleApi): void {
   server.tool(
     'search_people',
-    'Search Affinity contacts by name or email. Returns a list of matching people.',
+    'Search Affinity contacts by name or email. Returns up to 100 matching people, ordered by Affinity relevance.',
     {
       query: z.string().describe('Name or email to search for'),
       limit: z.number().int().min(1).max(100).default(20).describe('Max results to return'),
@@ -45,7 +45,7 @@ export function registerPeopleTools(server: McpServer, api: PeopleApi): void {
     'get_person',
     'Get full details for an Affinity contact by their numeric ID.',
     {
-      person_id: z.number().int().describe('Affinity person ID'),
+      person_id: z.number().int().min(1).describe('Affinity person ID'),
     },
     async ({ person_id }) => {
       try {
@@ -96,10 +96,26 @@ export function registerPeopleTools(server: McpServer, api: PeopleApi): void {
   );
 
   server.tool(
+    'delete_person',
+    'DESTRUCTIVE — permanently delete an Affinity person record by ID. This cannot be undone. All associated list entries, notes, and field values will also be removed. Confirm with the user before calling.',
+    {
+      person_id: z.number().int().min(1).describe('ID of the person to delete'),
+    },
+    async ({ person_id }) => {
+      try {
+        await api.delete(person_id);
+        return {
+          content: [{ type: 'text', text: `Person ${person_id} deleted successfully.` }],
+        };
+      } catch (e) { return toolError(e); }
+    }
+  );
+
+  server.tool(
     'update_person',
     'Update an existing Affinity contact by ID. Supply only the fields you want to change.',
     {
-      person_id: z.number().int().describe('Person ID to update'),
+      person_id: z.number().int().min(1).describe('Person ID to update'),
       first_name: z.string().optional().describe('New first name'),
       last_name: z.string().optional().describe('New last name'),
       emails: z.array(z.string().email()).optional().describe('Replacement email list (replaces current)'),

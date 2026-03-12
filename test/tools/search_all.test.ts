@@ -89,7 +89,7 @@ describe('search_all tool', () => {
     await callTool('search_all', { query: 'test', limit: 5 });
     expect(peopleApi.search).toHaveBeenCalledWith('test', 5);
     expect(orgsApi.search).toHaveBeenCalledWith('test', 5);
-    expect(oppsApi.search).toHaveBeenCalledWith('test');
+    expect(oppsApi.search).toHaveBeenCalledWith('test', undefined, 5);
   });
 
   it('shows "(no name)" when person has no first or last name', async () => {

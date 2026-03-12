@@ -40,12 +40,18 @@ export interface AffinityClientOptions {
   cache?: KVNamespace;
 }
 
+/**
+ * Base HTTP client for the Affinity v1 and v2 REST APIs.
+ * Handles authentication, URL construction, JSON serialisation,
+ * error classification, and rate-limit retry with exponential backoff.
+ */
 export class AffinityClient {
   private readonly v1BaseUrl: string;
   private readonly v2BaseUrl: string;
   private readonly authHeader: string;
   readonly cache: KVCache;
 
+  /** @param apiKey - Affinity API key (Bearer token). @param options - Optional base URL overrides and KV cache binding. */
   constructor(apiKey: string, options?: AffinityClientOptions) {
     if (!apiKey) throw new AffinityAuthError("AFFINITY_API_KEY is required.");
     // Affinity supports both Basic and Bearer auth; Bearer is simpler on the edge.
@@ -110,11 +116,15 @@ export class AffinityClient {
     return this.fetchWithRetry<T>(url.toString(), init);
   }
 
+  /**
+   * Fetch with automatic retry on 429 (rate limit) using exponential backoff (1 s, 2 s, 4 s).
+   * Classifies non-2xx responses into typed error subclasses for callers to catch selectively.
+   */
   private async fetchWithRetry<T>(url: string, init: RequestInit, attempt = 0): Promise<T> {
     const response = await fetch(url, init);
 
     if (response.ok) {
-      if (response.status === 204) return undefined as unknown as T;
+      if (response.status === 204) return undefined as unknown as T; // callers of del() ignore the return value
       return response.json() as Promise<T>;
     }
 

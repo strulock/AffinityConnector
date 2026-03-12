@@ -22,7 +22,7 @@ export function registerOpportunityTools(server: McpServer, api: OpportunitiesAp
     'Search Affinity opportunities (deals) by name. Omit term to list all. Optionally scope to a specific list with list_id.',
     {
       term: z.string().optional().describe('Name search term. Omit to list all opportunities.'),
-      list_id: z.number().int().optional().describe('Scope results to a specific list ID (from get_lists).'),
+      list_id: z.number().int().min(1).optional().describe('Scope results to a specific list ID (from get_lists).'),
     },
     async ({ term, list_id }) => {
       const opps = await api.search(term, list_id);
@@ -41,7 +41,7 @@ export function registerOpportunityTools(server: McpServer, api: OpportunitiesAp
     'get_opportunity',
     'Get full details for an Affinity opportunity by ID, including associated people, organizations, and list memberships.',
     {
-      opportunity_id: z.number().int().describe('Opportunity ID (from search_opportunities or get_list_entries)'),
+      opportunity_id: z.number().int().min(1).describe('Opportunity ID (from search_opportunities or get_list_entries)'),
     },
     async ({ opportunity_id }) => {
       try {
@@ -87,10 +87,26 @@ export function registerOpportunityTools(server: McpServer, api: OpportunitiesAp
   );
 
   server.tool(
+    'delete_opportunity',
+    'DESTRUCTIVE — permanently delete an Affinity opportunity record by ID. This cannot be undone. All associated list entries and field values will also be removed. Confirm with the user before calling.',
+    {
+      opportunity_id: z.number().int().min(1).describe('ID of the opportunity to delete'),
+    },
+    async ({ opportunity_id }) => {
+      try {
+        await api.delete(opportunity_id);
+        return {
+          content: [{ type: 'text', text: `Opportunity ${opportunity_id} deleted successfully.` }],
+        };
+      } catch (e) { return toolError(e); }
+    }
+  );
+
+  server.tool(
     'update_opportunity',
     'Update an existing Affinity opportunity — rename it or replace its associated people and organizations. Note: person_ids and organization_ids replace the full current list.',
     {
-      opportunity_id: z.number().int().describe('Opportunity ID to update'),
+      opportunity_id: z.number().int().min(1).describe('Opportunity ID to update'),
       name: z.string().optional().describe('New name'),
       person_ids: z.array(z.number().int()).optional().describe('Replacement list of person IDs (replaces current associations)'),
       organization_ids: z.array(z.number().int()).optional().describe('Replacement list of organization IDs (replaces current associations)'),

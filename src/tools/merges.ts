@@ -9,22 +9,30 @@ import type { AffinityMergeTask } from '../affinity/types.js';
 
 /**
  * Poll a merge task until it reaches a terminal state (completed/failed)
- * or the attempt limit is reached. Returns the final task state.
+ * or the attempt limit is reached. Returns null if polling throws (network/auth error).
  */
 async function pollUntilDone(
   api: MergesApi,
   taskId: string,
   type: 'person' | 'company',
   maxAttempts = 5,
-): Promise<AffinityMergeTask> {
+): Promise<AffinityMergeTask | null> {
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const task = await api.getMergeTaskStatus(taskId, type);
-    if (task.status === 'completed' || task.status === 'failed') return task;
-    if (attempt < maxAttempts - 1) {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const task = await api.getMergeTaskStatus(taskId, type);
+      if (task.status === 'completed' || task.status === 'failed') return task;
+      if (attempt < maxAttempts - 1) {
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      }
+    } catch {
+      return null;
     }
   }
-  return api.getMergeTaskStatus(taskId, type);
+  try {
+    return await api.getMergeTaskStatus(taskId, type);
+  } catch {
+    return null;
+  }
 }
 
 function formatMergeResult(task: AffinityMergeTask, baseId: number, mergeId: number, entityLabel: string): string {
@@ -42,8 +50,8 @@ export function registerMergeTools(server: McpServer, api: MergesApi): void {
     'merge_persons',
     'DESTRUCTIVE — permanently merge two Affinity person records. The base person record is kept; the other is merged in and deleted. Requires "Manage duplicates" permission. This cannot be undone — confirm with the user before calling.',
     {
-      base_person_id: z.number().int().describe('ID of the person record to keep (the merge target)'),
-      to_merge_person_id: z.number().int().describe('ID of the person record to merge in (will be deleted)'),
+      base_person_id: z.number().int().min(1).describe('ID of the person record to keep (the merge target)'),
+      to_merge_person_id: z.number().int().min(1).describe('ID of the person record to merge in (will be deleted)'),
     },
     async ({ base_person_id, to_merge_person_id }) => {
       try {
@@ -51,6 +59,9 @@ export function registerMergeTools(server: McpServer, api: MergesApi): void {
         const task = (initial.status === 'completed' || initial.status === 'failed')
           ? initial
           : await pollUntilDone(api, initial.id, 'person');
+        if (task === null) {
+          return { content: [{ type: 'text', text: `Merge initiated but status unknown. Task ID: ${initial.id} — check Affinity for the result.` }] };
+        }
         return { content: [{ type: 'text', text: formatMergeResult(task, base_person_id, to_merge_person_id, 'person') }] };
       } catch (e) { return toolError(e); }
     }
@@ -60,8 +71,8 @@ export function registerMergeTools(server: McpServer, api: MergesApi): void {
     'merge_companies',
     'DESTRUCTIVE — permanently merge two Affinity company records. The base company record is kept; the other is merged in and deleted. Requires "Manage duplicates" permission. This cannot be undone — confirm with the user before calling.',
     {
-      base_company_id: z.number().int().describe('ID of the company record to keep (the merge target)'),
-      to_merge_company_id: z.number().int().describe('ID of the company record to merge in (will be deleted)'),
+      base_company_id: z.number().int().min(1).describe('ID of the company record to keep (the merge target)'),
+      to_merge_company_id: z.number().int().min(1).describe('ID of the company record to merge in (will be deleted)'),
     },
     async ({ base_company_id, to_merge_company_id }) => {
       try {
@@ -69,6 +80,9 @@ export function registerMergeTools(server: McpServer, api: MergesApi): void {
         const task = (initial.status === 'completed' || initial.status === 'failed')
           ? initial
           : await pollUntilDone(api, initial.id, 'company');
+        if (task === null) {
+          return { content: [{ type: 'text', text: `Merge initiated but status unknown. Task ID: ${initial.id} — check Affinity for the result.` }] };
+        }
         return { content: [{ type: 'text', text: formatMergeResult(task, base_company_id, to_merge_company_id, 'company') }] };
       } catch (e) { return toolError(e); }
     }

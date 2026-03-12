@@ -93,6 +93,20 @@ describe('merge_persons tool', () => {
     const result = await callTool('merge_persons', { base_person_id: 999, to_merge_person_id: 200 });
     expect(result.content[0].text).toContain('Not found:');
   });
+
+  it('returns graceful message with task ID when getMergeTaskStatus throws during polling', async () => {
+    const mockApi = {
+      ...BASE_API(),
+      mergePersons: vi.fn().mockResolvedValue(PENDING_TASK),
+      getMergeTaskStatus: vi.fn().mockRejectedValue(new Error('Network error')),
+    } as unknown as MergesApi;
+    const { server, callTool } = makeMockServer();
+    registerMergeTools(server, mockApi);
+    const result = await callTool('merge_persons', { base_person_id: 1, to_merge_person_id: 2 });
+    const text = result.content[0].text;
+    expect(text).toContain('task-3');
+    expect(text).toContain('status unknown');
+  });
 }); // end merge_persons
 
 describe('merge_companies tool', () => {

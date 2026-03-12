@@ -125,7 +125,7 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
 
 async function handleMcp(request: Request, env: Env): Promise<Response> {
   if (!env.AFFINITY_API_KEY) {
-    return withCors(new Response("AFFINITY_API_KEY secret is not configured.", { status: 500 }));
+    return withCors(new Response("Server configuration error.", { status: 500 }));
   }
 
   if (env.CLOUDFLARE_ACCESS_JWT_VALIDATION && env.CLOUDFLARE_ACCESS_AUD && env.CLOUDFLARE_ACCESS_TEAM_DOMAIN) {
