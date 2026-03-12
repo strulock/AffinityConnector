@@ -3,13 +3,14 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { TranscriptsApi } from '../affinity/transcripts.js';
+import { toolError } from './_error.js';
 import type { AffinityTranscript, AffinityTranscriptFragment } from '../affinity/types.js';
 
 function formatTranscript(t: AffinityTranscript): string {
   const title = t.title ? ` — "${t.title}"` : '';
   const assoc: string[] = [];
-  if (t.person_ids.length) assoc.push(`people: ${t.person_ids.join(', ')}`);
-  if (t.organization_ids.length) assoc.push(`orgs: ${t.organization_ids.join(', ')}`);
+  if (t.person_ids?.length) assoc.push(`people: ${t.person_ids.join(', ')}`);
+  if (t.organization_ids?.length) assoc.push(`orgs: ${t.organization_ids.join(', ')}`);
   const assocStr = assoc.length ? ` [${assoc.join('; ')}]` : '';
   return `[transcript:${t.id}] ${t.created_at}${title}${assocStr}`;
 }
@@ -25,22 +26,24 @@ export function registerTranscriptTools(server: McpServer, api: TranscriptsApi):
     'get_transcripts',
     '(BETA) List call and meeting transcripts from Affinity. Optionally filter by person or organization.',
     {
-      person_id: z.number().int().optional().describe('Filter to transcripts involving this person ID'),
-      organization_id: z.number().int().optional().describe('Filter to transcripts involving this org ID'),
+      person_id: z.number().int().min(1).optional().describe('Filter to transcripts involving this person ID'),
+      organization_id: z.number().int().min(1).optional().describe('Filter to transcripts involving this org ID'),
       limit: z.number().int().min(1).max(100).default(25).describe('Max transcripts to return'),
       page_token: z.string().optional().describe('Pagination token from a previous call'),
     },
     async ({ person_id, organization_id, limit, page_token }) => {
-      const { transcripts, nextPageToken } = await api.getTranscripts({
-        person_id, organization_id, limit, page_token,
-      });
-      if (transcripts.length === 0) {
-        return { content: [{ type: 'text', text: 'No transcripts found.' }] };
-      }
-      const lines = transcripts.map(formatTranscript);
-      let text = `${transcripts.length} transcript(s):\n\n${lines.join('\n')}`;
-      if (nextPageToken) text += `\n\nMore available. Use page_token: "${nextPageToken}"`;
-      return { content: [{ type: 'text', text }] };
+      try {
+        const { transcripts, nextPageToken } = await api.getTranscripts({
+          person_id, organization_id, limit, page_token,
+        });
+        if (transcripts.length === 0) {
+          return { content: [{ type: 'text', text: 'No transcripts found.' }] };
+        }
+        const lines = transcripts.map(formatTranscript);
+        let text = `${transcripts.length} transcript(s):\n\n${lines.join('\n')}`;
+        if (nextPageToken) text += `\n\nMore available. Use page_token: "${nextPageToken}"`;
+        return { content: [{ type: 'text', text }] };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -53,19 +56,21 @@ export function registerTranscriptTools(server: McpServer, api: TranscriptsApi):
       page_token: z.string().optional().describe('Pagination token for long transcripts'),
     },
     async ({ transcript_id, limit, page_token }) => {
-      const [transcript, { fragments, nextPageToken }] = await Promise.all([
-        api.getTranscript(transcript_id),
-        api.getTranscriptFragments(transcript_id, { limit, page_token }),
-      ]);
+      try {
+        const [transcript, { fragments, nextPageToken }] = await Promise.all([
+          api.getTranscript(transcript_id),
+          api.getTranscriptFragments(transcript_id, { limit, page_token }),
+        ]);
 
-      const header = formatTranscript(transcript);
-      if (fragments.length === 0) {
-        return { content: [{ type: 'text', text: `${header}\n\nNo transcript content available.` }] };
-      }
-      const lines = fragments.map(formatFragment);
-      let text = `${header}\n\n${lines.join('\n')}`;
-      if (nextPageToken) text += `\n\nMore content available. Use page_token: "${nextPageToken}"`;
-      return { content: [{ type: 'text', text }] };
+        const header = formatTranscript(transcript);
+        if (fragments.length === 0) {
+          return { content: [{ type: 'text', text: `${header}\n\nNo transcript content available.` }] };
+        }
+        const lines = fragments.map(formatFragment);
+        let text = `${header}\n\n${lines.join('\n')}`;
+        if (nextPageToken) text += `\n\nMore content available. Use page_token: "${nextPageToken}"`;
+        return { content: [{ type: 'text', text }] };
+      } catch (e) { return toolError(e); }
     }
   );
 }

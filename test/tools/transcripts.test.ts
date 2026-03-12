@@ -66,6 +66,26 @@ describe('get_transcripts tool', () => {
     expect(text).not.toContain('[people:');
   });
 
+  it('handles transcripts with null person_ids and organization_ids', async () => {
+    const transcript = {
+      ...MOCK_TRANSCRIPT,
+      id: 'tx-null',
+      person_ids: undefined as unknown as number[],
+      organization_ids: null as unknown as number[],
+    };
+    const mockApi = {
+      ...BASE_API(),
+      getTranscripts: vi.fn().mockResolvedValue({ transcripts: [transcript], nextPageToken: undefined }),
+    } as unknown as TranscriptsApi;
+    const { server, callTool } = makeMockServer();
+    registerTranscriptTools(server, mockApi);
+    const result = await callTool('get_transcripts', { limit: 25 });
+    const text = result.content[0].text;
+    expect(text).toContain('[transcript:tx-null]');
+    expect(text).not.toContain('[people:');
+    expect(text).not.toContain('[orgs:');
+  });
+
   it('returns message when no transcripts found', async () => {
     const mockApi = {
       ...BASE_API(),
