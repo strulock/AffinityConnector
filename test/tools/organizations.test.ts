@@ -181,3 +181,29 @@ describe('update_organization tool', () => {
     expect(result.content[0].text).toContain('Not found:');
   });
 });
+
+describe('delete_organization tool', () => {
+  it('returns confirmation after successful deletion', async () => {
+    const { callTool } = setup({ success: true });
+    const result = await callTool('delete_organization', { org_id: 10 });
+    expect(result.content[0].text).toContain('deleted successfully');
+    expect(result.content[0].text).toContain('10');
+  });
+
+  it('returns a Not found response when the API returns 404', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not found', { status: 404 })));
+    const api = new OrganizationsApi(new AffinityClient('key'));
+    const { server, callTool } = makeMockServer();
+    registerOrganizationTools(server, api);
+    const result = await callTool('delete_organization', { org_id: 999 });
+    expect(result.content[0].text).toContain('Not found:');
+  });
+
+  it('re-throws unknown errors from delete_organization', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('server error')));
+    const api = new OrganizationsApi(new AffinityClient('key'));
+    const { server, callTool } = makeMockServer();
+    registerOrganizationTools(server, api);
+    await expect(callTool('delete_organization', { org_id: 10 })).rejects.toThrow('server error');
+  });
+});

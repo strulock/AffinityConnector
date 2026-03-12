@@ -31,7 +31,7 @@ export function registerIntelligenceTools(
     'get_relationship_strength',
     'Get the relationship strength score between you and a person or organization in Affinity. Returns a 0–100 score and last activity date.',
     {
-      entity_id: z.number().int().describe('Person or organization ID'),
+      entity_id: z.number().int().min(1).describe('Person or organization ID'),
       entity_type: z
         .number()
         .int()
@@ -59,11 +59,17 @@ export function registerIntelligenceTools(
     'find_intro_path',
     'Find people in your network who can introduce you to a target person, based on shared organizations and relationship strength.',
     {
-      person_id: z.number().int().describe('ID of the person you want an introduction to'),
+      person_id: z.number().int().min(1).describe('ID of the person you want an introduction to'),
     },
     async ({ person_id }) => {
       // 1. Get target person to find their organizations
-      const target = await peopleApi.getById(person_id);
+      const target = await peopleApi.getById(person_id).catch((e: unknown) => {
+        if (e instanceof AffinityNotFoundError) return null;
+        throw e;
+      });
+      if (target === null) {
+        return { content: [{ type: 'text', text: `Person ${person_id} not found in Affinity — no intro path available.` }] };
+      }
       const targetName = [target.first_name, target.last_name].filter(Boolean).join(' ') || `Person ${person_id}`;
 
       if (!target.organization_ids?.length) {
@@ -78,15 +84,19 @@ export function registerIntelligenceTools(
       }
 
       // 2. For each org (max 3), collect member person IDs
-      const orgIds = target.organization_ids.slice(0, 3);
+      const MAX_ORGS = 3;
+      const MAX_CONNECTOR_CANDIDATES = 20;
+      const MAX_INTRO_RESULTS = 10;
+      const orgIds = target.organization_ids.slice(0, MAX_ORGS);
       const orgResults = await Promise.all(
         orgIds.map((id) => orgsApi.getById(id).catch(() => null))
       );
 
+      let skippedOrgs = 0;
       const connectorIds = new Set<number>();
       const orgNames: Record<number, string> = {};
       for (const org of orgResults) {
-        if (!org) continue;
+        if (!org) { skippedOrgs++; continue; }
         orgNames[org.id] = org.name;
         for (const pid of org.person_ids ?? []) {
           if (pid !== person_id) connectorIds.add(pid);
@@ -94,18 +104,15 @@ export function registerIntelligenceTools(
       }
 
       if (connectorIds.size === 0) {
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `No shared organization members found who could introduce you to ${targetName}.`,
-            },
-          ],
-        };
+        let text = `No shared organization members found who could introduce you to ${targetName}.`;
+        if (skippedOrgs > 0) {
+          text += `\n\n(Note: ${skippedOrgs} organization(s) could not be fetched and were excluded from the intro path.)`;
+        }
+        return { content: [{ type: 'text', text }] };
       }
 
-      // 3. Fetch relationship strengths for up to 20 connectors in parallel
-      const candidateIds = [...connectorIds].slice(0, 20);
+      // 3. Fetch relationship strengths for up to MAX_CONNECTOR_CANDIDATES connectors in parallel
+      const candidateIds = [...connectorIds].slice(0, MAX_CONNECTOR_CANDIDATES);
       const strengthResults = await Promise.all(
         candidateIds.map(async (id) => {
           try {
@@ -119,10 +126,10 @@ export function registerIntelligenceTools(
         })
       );
 
-      // 4. Fetch names for top 10 by strength
+      // 4. Fetch names for top MAX_INTRO_RESULTS by strength
       const top = strengthResults
         .sort((a, b) => b.strength - a.strength)
-        .slice(0, 10);
+        .slice(0, MAX_INTRO_RESULTS);
 
       const peopleResults = await Promise.all(
         top.map((c) => peopleApi.getById(c.id).catch(() => null))
@@ -144,7 +151,11 @@ export function registerIntelligenceTools(
         lines.push(`${i + 1}. ${name}${emailStr} — strength: ${candidate.strength}/100 (${label}), last active: ${lastActivity}`);
       }
 
-      return { content: [{ type: 'text', text: lines.join('\n') }] };
+      let text = lines.join('\n');
+      if (skippedOrgs > 0) {
+        text += `\n\n(Note: ${skippedOrgs} organization(s) could not be fetched and were excluded from the intro path.)`;
+      }
+      return { content: [{ type: 'text', text }] };
     }
   );
 

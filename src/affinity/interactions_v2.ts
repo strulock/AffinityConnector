@@ -19,6 +19,7 @@ type CommonParams = {
   page_token?: string;
 };
 
+/** Normalise CommonParams into the query-param shape the v2 API expects. */
 function buildParams(params: CommonParams): Record<string, unknown> {
   const { limit = 25, page_token, ...filters } = params;
   const q: Record<string, unknown> = { page_size: limit, ...filters };

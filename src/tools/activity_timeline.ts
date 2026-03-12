@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { InteractionsV2Api } from '../affinity/interactions_v2.js';
 import { NotesApi } from '../affinity/notes.js';
+import { toolError } from './_error.js';
 
 interface TimelineItem {
   date: string;
@@ -24,10 +25,10 @@ export function registerActivityTimelineTool(
 ): void {
   server.tool(
     'get_activity_timeline',
-    'Get a unified, chronologically sorted activity timeline for a person or organization — combines emails, meetings, and notes in a single view. Useful for pre-call prep or relationship reviews.',
+    'Get a unified, chronologically sorted activity timeline for a person or organization — combines emails, meetings, and notes in a single view. Note: calls and chat messages are not included; use get_calls and get_chat_messages for those. Useful for pre-call prep or relationship reviews.',
     {
-      person_id: z.number().int().optional().describe('Person ID to fetch activity for'),
-      organization_id: z.number().int().optional().describe('Organization ID to fetch activity for'),
+      person_id: z.number().int().min(1).optional().describe('Person ID to fetch activity for'),
+      organization_id: z.number().int().min(1).optional().describe('Organization ID to fetch activity for'),
       limit: z.number().int().min(1).max(100).default(20).describe('Max total items to return (default 20)'),
       since: z.string().optional().describe('ISO 8601 date — only return activity on or after this date'),
     },
@@ -36,6 +37,7 @@ export function registerActivityTimelineTool(
         return { content: [{ type: 'text', text: 'Provide either person_id or organization_id.' }] };
       }
 
+      try {
       const scope = { person_id, organization_id, limit };
 
       const [{ emails }, { meetings }, { notes }] = await Promise.all([
@@ -86,6 +88,7 @@ export function registerActivityTimelineTool(
           text: `${limited.length} activity item(s) for ${scope_label}${since_label}:\n\n${lines.join('\n')}`,
         }],
       };
+      } catch (e) { return toolError(e); }
     }
   );
 }

@@ -31,6 +31,7 @@ function makeApi(overrides: Partial<Record<keyof OpportunitiesApi, unknown>> = {
     getById: vi.fn().mockResolvedValue(MOCK_OPP),
     create: vi.fn().mockResolvedValue(MOCK_OPP),
     update: vi.fn().mockResolvedValue(MOCK_OPP),
+    delete: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   } as unknown as OpportunitiesApi;
 }
@@ -164,5 +165,28 @@ describe('update_opportunity tool', () => {
     const { callTool } = setup({ update: vi.fn().mockRejectedValue(new AffinityNotFoundError('opp 999 not found')) });
     const result = await callTool('update_opportunity', { opportunity_id: 999, name: 'New Name' });
     expect(result.content[0].text).toContain('Not found:');
+  });
+});
+
+// ── delete_opportunity ────────────────────────────────────────────────────
+
+describe('delete_opportunity tool', () => {
+  it('returns confirmation after successful deletion', async () => {
+    const { callTool, api } = setup();
+    const result = await callTool('delete_opportunity', { opportunity_id: 1 });
+    expect(api.delete).toHaveBeenCalledWith(1);
+    expect(result.content[0].text).toContain('deleted successfully');
+    expect(result.content[0].text).toContain('1');
+  });
+
+  it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
+    const { callTool } = setup({ delete: vi.fn().mockRejectedValue(new AffinityNotFoundError('opp 999 not found')) });
+    const result = await callTool('delete_opportunity', { opportunity_id: 999 });
+    expect(result.content[0].text).toContain('Not found:');
+  });
+
+  it('re-throws unknown errors from delete_opportunity', async () => {
+    const { callTool } = setup({ delete: vi.fn().mockRejectedValue(new Error('server error')) });
+    await expect(callTool('delete_opportunity', { opportunity_id: 1 })).rejects.toThrow('server error');
   });
 });

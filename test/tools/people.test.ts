@@ -197,3 +197,29 @@ describe('update_person tool', () => {
     expect(result.content[0].text).toContain('Not found:');
   });
 });
+
+describe('delete_person tool', () => {
+  it('returns confirmation after successful deletion', async () => {
+    const { callTool } = setup({ success: true });
+    const result = await callTool('delete_person', { person_id: 1 });
+    expect(result.content[0].text).toContain('deleted successfully');
+    expect(result.content[0].text).toContain('1');
+  });
+
+  it('returns a Not found response when the API returns 404', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('not found', { status: 404 })));
+    const api = new PeopleApi(new AffinityClient('key'));
+    const { server, callTool } = makeMockServer();
+    registerPeopleTools(server, api);
+    const result = await callTool('delete_person', { person_id: 999 });
+    expect(result.content[0].text).toContain('Not found:');
+  });
+
+  it('re-throws unknown errors from delete_person', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('server error')));
+    const api = new PeopleApi(new AffinityClient('key'));
+    const { server, callTool } = makeMockServer();
+    registerPeopleTools(server, api);
+    await expect(callTool('delete_person', { person_id: 1 })).rejects.toThrow('server error');
+  });
+});

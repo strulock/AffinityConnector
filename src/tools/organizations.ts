@@ -18,7 +18,7 @@ function formatOrg(o: AffinityOrganization): string {
 export function registerOrganizationTools(server: McpServer, api: OrganizationsApi): void {
   server.tool(
     'search_organizations',
-    'Search Affinity organizations (companies) by name or domain.',
+    'Search Affinity organizations (companies) by name or domain. Returns up to 100 matching organizations, ordered by Affinity relevance.',
     {
       query: z.string().describe('Company name or domain to search for'),
       limit: z.number().int().min(1).max(100).default(20).describe('Max results to return'),
@@ -46,7 +46,7 @@ export function registerOrganizationTools(server: McpServer, api: OrganizationsA
     'get_organization',
     'Get full details for an Affinity organization by its numeric ID.',
     {
-      org_id: z.number().int().describe('Affinity organization ID'),
+      org_id: z.number().int().min(1).describe('Affinity organization ID'),
     },
     async ({ org_id }) => {
       try {
@@ -91,10 +91,26 @@ export function registerOrganizationTools(server: McpServer, api: OrganizationsA
   );
 
   server.tool(
+    'delete_organization',
+    'DESTRUCTIVE — permanently delete an Affinity organization record by ID. This cannot be undone. All associated list entries, notes, and field values will also be removed. Confirm with the user before calling.',
+    {
+      org_id: z.number().int().min(1).describe('ID of the organization to delete'),
+    },
+    async ({ org_id }) => {
+      try {
+        await api.delete(org_id);
+        return {
+          content: [{ type: 'text', text: `Organization ${org_id} deleted successfully.` }],
+        };
+      } catch (e) { return toolError(e); }
+    }
+  );
+
+  server.tool(
     'update_organization',
     'Update an existing Affinity organization by ID. Supply only the fields you want to change.',
     {
-      org_id: z.number().int().describe('Organization ID to update'),
+      org_id: z.number().int().min(1).describe('Organization ID to update'),
       name: z.string().optional().describe('New company name'),
       domain: z.string().optional().describe('New primary domain'),
       person_ids: z.array(z.number().int()).optional().describe('Replacement person ID list (replaces current)'),

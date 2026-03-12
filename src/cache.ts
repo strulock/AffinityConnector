@@ -2,6 +2,23 @@
 // If no KV namespace is provided (e.g. local dev without .dev.vars binding),
 // all operations are no-ops and requests pass through to the API.
 
+// Cache key convention: "<namespace>:<sorted-params-json>"
+// Use stableKey() for any key derived from an object so key order never affects cache hits.
+// Simple scalar keys (e.g. `people:${id}`) are fine as plain template strings.
+
+/**
+ * Build a deterministic cache key by sorting object keys before stringifying.
+ * Undefined values are omitted so optional params don't affect the key.
+ */
+export function stableKey(prefix: string, params: Record<string, unknown>): string {
+  const sorted = Object.fromEntries(
+    Object.entries(params)
+      .filter(([, v]) => v !== undefined)
+      .sort(([a], [b]) => a.localeCompare(b))
+  );
+  return `${prefix}:${JSON.stringify(sorted)}`;
+}
+
 export class KVCache {
   constructor(private kv: KVNamespace | undefined) {}
 

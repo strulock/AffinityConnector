@@ -53,6 +53,18 @@ describe('NotesApi.getNotes', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('treats params with different key insertion order as the same cache key', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([MOCK_NOTE]), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const client = new AffinityClient('key', { cache: makeKVMock() });
+    const api = new NotesApi(client);
+    await api.getNotes({ person_id: 1, organization_id: 2 });
+    await api.getNotes({ organization_id: 2, person_id: 1 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('includes page_token in request when provided', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify([]), { status: 200 })

@@ -48,6 +48,17 @@ describe('RemindersApi.getReminders', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('treats params with different key insertion order as the same cache key', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify([MOCK_REMINDER]), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new RemindersApi(new AffinityClient('key', { cache: makeKVMock() }));
+    await api.getReminders({ person_id: 10, organization_id: 20 });
+    await api.getReminders({ organization_id: 20, person_id: 10 });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('uses separate cache keys for different filter params', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify([MOCK_REMINDER]), { status: 200 }))

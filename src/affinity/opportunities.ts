@@ -12,13 +12,15 @@ export class OpportunitiesApi {
 
   /**
    * Search/list opportunities. Pass `term` to filter by name;
-   * pass `listId` to scope results to a specific list.
+   * pass `listId` to scope results to a specific list;
+   * pass `limit` to cap the result count.
    * Not cached — search results are dynamic.
    */
-  async search(term?: string, listId?: number): Promise<AffinityOpportunity[]> {
+  async search(term?: string, listId?: number, limit?: number): Promise<AffinityOpportunity[]> {
     const params: Record<string, unknown> = {};
     if (term) params.term = term;
     if (listId != null) params.list_id = listId;
+    if (limit != null) params.page_size = limit;
     const result = await this.client.get<AffinityOpportunity[]>('/opportunities', params);
     return Array.isArray(result) ? result : [];
   }
@@ -50,6 +52,15 @@ export class OpportunitiesApi {
     list_id?: number;
   }): Promise<AffinityOpportunity> {
     return this.client.post<AffinityOpportunity>('/opportunities', params);
+  }
+
+  /**
+   * Delete an opportunity by ID (v1 DELETE /opportunities/{id}).
+   * Clears the cache entry. This is permanent and cannot be undone.
+   */
+  async delete(id: number): Promise<void> {
+    await this.client.del<{ success: boolean }>(`/opportunities/${id}`);
+    await this.client.cache.delete(`opportunity:${id}`);
   }
 
   /**

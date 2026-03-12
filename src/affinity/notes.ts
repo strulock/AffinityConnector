@@ -1,7 +1,7 @@
 // Affinity v1 notes and interactions endpoints: /notes, /interactions
 
 import { AffinityClient } from './client.js';
-import { CACHE_TTL } from '../cache.js';
+import { CACHE_TTL, stableKey } from '../cache.js';
 import type { AffinityNote, AffinityNoteReply, AffinityPaginatedResponse } from './types.js';
 
 export class NotesApi {
@@ -19,7 +19,7 @@ export class NotesApi {
     page_token?: string;
   }): Promise<{ notes: AffinityNote[]; nextPageToken?: string }> {
     const { limit = 25, page_token, ...filters } = params;
-    const cacheKey = `notes:${JSON.stringify(filters)}:${limit}:${page_token ?? ''}`;
+    const cacheKey = stableKey('notes', { ...filters, limit, page_token });
     const cached = await this.client.cache.get<{ notes: AffinityNote[] }>(cacheKey);
     if (cached) return cached;
 
@@ -43,13 +43,15 @@ export class NotesApi {
     organization_ids?: number[];
     opportunity_ids?: number[];
   }): Promise<AffinityNote> {
-    return this.client.post<AffinityNote>('/notes', {
+    const note = await this.client.post<AffinityNote>('/notes', {
       content: params.content,
       person_ids: params.person_ids ?? [],
       organization_ids: params.organization_ids ?? [],
       opportunity_ids: params.opportunity_ids ?? [],
       type: 0,
     });
+    await this.client.cache.deleteWithPrefix('notes:');
+    return note;
   }
 
   /**
@@ -75,13 +77,16 @@ export class NotesApi {
     };
   }
 
-  /** Update the content of an existing note (v1 PUT /notes/{id}). */
+  /** Update the content of an existing note (v1 PUT /notes/{id}). Invalidates notes cache. */
   async updateNote(noteId: number, content: string): Promise<AffinityNote> {
-    return this.client.put<AffinityNote>(`/notes/${noteId}`, { content });
+    const note = await this.client.put<AffinityNote>(`/notes/${noteId}`, { content });
+    await this.client.cache.deleteWithPrefix('notes:');
+    return note;
   }
 
-  /** Delete a note by ID (v1 DELETE /notes/{id}). */
+  /** Delete a note by ID (v1 DELETE /notes/{id}). Invalidates notes cache. */
   async deleteNote(noteId: number): Promise<void> {
     await this.client.del<{ success: boolean }>(`/notes/${noteId}`);
+    await this.client.cache.deleteWithPrefix('notes:');
   }
 }

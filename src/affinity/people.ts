@@ -49,6 +49,21 @@ export class PeopleApi {
     return person;
   }
 
+  /**
+   * Delete a person record by ID (v1 DELETE /persons/{id}).
+   * Clears the person's cache entry and invalidates search cache.
+   * This is permanent and cannot be undone.
+   */
+  async delete(personId: number): Promise<void> {
+    await this.client.del<{ success: boolean }>(`/persons/${personId}`);
+    await this.client.cache.delete(`people:${personId}`);
+    await this.client.cache.deleteWithPrefix('people:search:');
+  }
+
+  /**
+   * Fetch a single person by ID, including interaction dates.
+   * Result is cached for 5 minutes (CACHE_TTL.profile).
+   */
   async getById(personId: number): Promise<AffinityPerson> {
     const cacheKey = `people:${personId}`;
     const cached = await this.client.cache.get<AffinityPerson>(cacheKey);

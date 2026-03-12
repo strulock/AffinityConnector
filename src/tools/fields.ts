@@ -57,6 +57,7 @@ export function registerFieldTools(server: McpServer, api: FieldsApi): void {
       list_id: z
         .number()
         .int()
+        .min(1)
         .optional()
         .describe('Required when scope is "list". List ID from get_lists.'),
     },
@@ -106,15 +107,17 @@ export function registerFieldTools(server: McpServer, api: FieldsApi): void {
     'get_field_value_changes',
     'Get the audit history of changes to a specific Affinity field. Shows who changed the value, to what, and when. Useful for tracking pipeline stage transitions and other field mutations over time.',
     {
-      field_id: z.number().int().describe('Field ID (from get_field_definitions)'),
+      field_id: z.number().int().min(1).describe('Field ID (from get_field_definitions)'),
       entity_id: z
         .number()
         .int()
+        .min(1)
         .optional()
         .describe('Filter changes to a specific person or organization by their ID'),
       list_entry_id: z
         .number()
         .int()
+        .min(1)
         .optional()
         .describe('Filter changes to a specific list entry by its ID'),
     },

@@ -21,19 +21,21 @@ export function registerReminderTools(server: McpServer, api: RemindersApi): voi
     'get_reminders',
     'List Affinity reminders. Optionally filter by person_id or organization_id to see follow-ups for a specific contact or company.',
     {
-      person_id: z.number().int().optional().describe('Filter to reminders associated with this person ID'),
-      organization_id: z.number().int().optional().describe('Filter to reminders associated with this org ID'),
-      opportunity_id: z.number().int().optional().describe('Filter to reminders associated with this opportunity ID'),
+      person_id: z.number().int().min(1).optional().describe('Filter to reminders associated with this person ID'),
+      organization_id: z.number().int().min(1).optional().describe('Filter to reminders associated with this org ID'),
+      opportunity_id: z.number().int().min(1).optional().describe('Filter to reminders associated with this opportunity ID'),
     },
     async ({ person_id, organization_id, opportunity_id }) => {
-      const reminders = await api.getReminders({ person_id, organization_id, opportunity_id });
-      if (reminders.length === 0) {
-        return { content: [{ type: 'text', text: 'No reminders found.' }] };
-      }
-      const lines = reminders.map(formatReminder);
-      return {
-        content: [{ type: 'text', text: `${reminders.length} reminder(s):\n\n${lines.join('\n')}` }],
-      };
+      try {
+        const reminders = await api.getReminders({ person_id, organization_id, opportunity_id });
+        if (reminders.length === 0) {
+          return { content: [{ type: 'text', text: 'No reminders found.' }] };
+        }
+        const lines = reminders.map(formatReminder);
+        return {
+          content: [{ type: 'text', text: `${reminders.length} reminder(s):\n\n${lines.join('\n')}` }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -42,7 +44,9 @@ export function registerReminderTools(server: McpServer, api: RemindersApi): voi
     'Create a follow-up reminder in Affinity. Provide content, a due date (YYYY-MM-DD), and at least one associated person, org, or opportunity.',
     {
       content: z.string().describe('Reminder text / follow-up note'),
-      due_date: z.string().describe('Due date in YYYY-MM-DD format'),
+      due_date: z.string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, 'due_date must be in YYYY-MM-DD format')
+        .describe('Due date in YYYY-MM-DD format'),
       person_ids: z.array(z.number().int()).optional().describe('Person IDs to associate with this reminder'),
       organization_ids: z.array(z.number().int()).optional().describe('Organization IDs to associate'),
       opportunity_ids: z.array(z.number().int()).optional().describe('Opportunity IDs to associate'),
@@ -75,9 +79,12 @@ export function registerReminderTools(server: McpServer, api: RemindersApi): voi
     'update_reminder',
     'Update an existing Affinity reminder. Supply only the fields you want to change. Mark completed: true to close it out.',
     {
-      reminder_id: z.number().int().describe('Reminder ID to update (from get_reminders)'),
+      reminder_id: z.number().int().min(1).describe('Reminder ID to update (from get_reminders)'),
       content: z.string().optional().describe('New reminder text'),
-      due_date: z.string().optional().describe('New due date in YYYY-MM-DD format'),
+      due_date: z.string()
+        .regex(/^\d{4}-\d{2}-\d{2}$/, 'due_date must be in YYYY-MM-DD format')
+        .optional()
+        .describe('New due date in YYYY-MM-DD format'),
       completed: z.boolean().optional().describe('Set to true to mark the reminder as completed'),
     },
     async ({ reminder_id, content, due_date, completed }) => {
@@ -100,7 +107,7 @@ export function registerReminderTools(server: McpServer, api: RemindersApi): voi
     'delete_reminder',
     'Delete an Affinity reminder by its ID. Use get_reminders to find reminder IDs.',
     {
-      reminder_id: z.number().int().describe('Reminder ID to delete (from get_reminders)'),
+      reminder_id: z.number().int().min(1).describe('Reminder ID to delete (from get_reminders)'),
     },
     async ({ reminder_id }) => {
       try {

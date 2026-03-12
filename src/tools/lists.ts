@@ -87,7 +87,7 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
     'get_list_entries',
     'Get entries from an Affinity list by list ID. Each entry is a person, organization, or opportunity on that list.',
     {
-      list_id: z.number().int().describe('Affinity list ID (use get_lists to find IDs)'),
+      list_id: z.number().int().min(1).describe('Affinity list ID (use get_lists to find IDs)'),
       limit: z.number().int().min(1).max(100).default(25).describe('Max entries to return'),
       page_token: z.string().optional().describe('Pagination token from a previous call'),
     },
@@ -111,7 +111,7 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
     'get_field_values',
     'Get custom field values for a specific list entry. Returns all field data attached to that entry.',
     {
-      list_entry_id: z.number().int().describe('List entry ID (from get_list_entries results)'),
+      list_entry_id: z.number().int().min(1).describe('List entry ID (from get_list_entries results)'),
     },
     async ({ list_entry_id }) => {
       try {
@@ -138,18 +138,18 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
     'set_field_value',
     'Create or update a custom field value on an Affinity list entry. If field_value_id is provided the existing value is updated (PUT); otherwise a new value is created (POST). Call get_field_definitions first to find field IDs and types, and get_field_values to find existing field_value_ids.',
     {
-      field_id: z.number().int().describe('Field ID (from get_field_definitions)'),
+      field_id: z.number().int().min(1).describe('Field ID (from get_field_definitions)'),
       value: z
         .union([z.string(), z.number(), z.boolean(), z.null()])
         .describe('New value for the field. Use a string for text/date/dropdown, number for numeric fields, null to clear.'),
       field_value_id: z
-        .number().int().optional()
+        .number().int().min(1).optional()
         .describe('Existing field value ID to update (from get_field_values). If omitted, a new value is created.'),
       list_entry_id: z
-        .number().int().optional()
+        .number().int().min(1).optional()
         .describe('List entry ID — required when creating a new value.'),
       entity_id: z
-        .number().int().optional()
+        .number().int().min(1).optional()
         .describe('Entity ID of the person, org, or opportunity — required when creating a new value.'),
       entity_type: z
         .number().int().optional()
@@ -168,9 +168,9 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
       try {
         const result = await api.setFieldValue({
           field_id,
-          entity_id: entity_id ?? 0,
-          entity_type: entity_type ?? 0,
-          list_entry_id: list_entry_id ?? 0,
+          entity_id: entity_id!,
+          entity_type: entity_type!,
+          list_entry_id: list_entry_id!,
           value,
           field_value_id,
         });
@@ -190,7 +190,7 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
     'delete_field_value',
     'Delete a custom field value from an Affinity list entry by its field value ID. Use get_field_values to find field value IDs.',
     {
-      field_value_id: z.number().int().describe('Field value ID to delete (from get_field_values results)'),
+      field_value_id: z.number().int().min(1).describe('Field value ID to delete (from get_field_values results)'),
     },
     async ({ field_value_id }) => {
       try {
@@ -206,8 +206,8 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
     'add_to_list',
     'Add a person, organization, or opportunity to an Affinity list. Use get_lists to find list IDs.',
     {
-      list_id: z.number().int().describe('List ID to add to (from get_lists)'),
-      entity_id: z.number().int().describe('ID of the person, org, or opportunity to add'),
+      list_id: z.number().int().min(1).describe('List ID to add to (from get_lists)'),
+      entity_id: z.number().int().min(1).describe('ID of the person, org, or opportunity to add'),
       entity_type: z.number().int().describe('Entity type: 0 = person, 1 = organization, 8 = opportunity'),
     },
     async ({ list_id, entity_id, entity_type }) => {
@@ -224,8 +224,8 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
     'remove_from_list',
     'Remove an entry from an Affinity list by its list entry ID. Use get_list_entries to find list entry IDs.',
     {
-      list_id: z.number().int().describe('List ID containing the entry (from get_lists)'),
-      list_entry_id: z.number().int().describe('List entry ID to remove (from get_list_entries)'),
+      list_id: z.number().int().min(1).describe('List ID containing the entry (from get_lists)'),
+      list_entry_id: z.number().int().min(1).describe('List entry ID to remove (from get_list_entries)'),
     },
     async ({ list_id, list_entry_id }) => {
       try {
@@ -241,19 +241,21 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
     'get_saved_views',
     'List all saved views defined for an Affinity list. Each view has a name and ID that can be used with get_saved_view_entries.',
     {
-      list_id: z.number().int().describe('List ID (from get_lists)'),
+      list_id: z.number().int().min(1).describe('List ID (from get_lists)'),
     },
     async ({ list_id }) => {
-      const views = await api.getSavedViews(list_id);
-      if (views.length === 0) {
-        return { content: [{ type: 'text', text: `No saved views found for list ${list_id}.` }] };
-      }
-      const lines = views.map(
-        v => `[view:${v.id}] ${v.name} — by user ${v.creator_id}${v.is_public ? ', public' : ', private'}`
-      );
-      return {
-        content: [{ type: 'text', text: `${views.length} saved view(s) for list ${list_id}:\n\n${lines.join('\n')}` }],
-      };
+      try {
+        const views = await api.getSavedViews(list_id);
+        if (views.length === 0) {
+          return { content: [{ type: 'text', text: `No saved views found for list ${list_id}.` }] };
+        }
+        const lines = views.map(
+          v => `[view:${v.id}] ${v.name} — by user ${v.creator_id}${v.is_public ? ', public' : ', private'}`
+        );
+        return {
+          content: [{ type: 'text', text: `${views.length} saved view(s) for list ${list_id}:\n\n${lines.join('\n')}` }],
+        };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -261,11 +263,11 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
     'batch_set_field_values',
     'Update multiple custom field values on a single list entry in one request (v2). Accepts up to 100 field/value pairs. Use get_field_definitions to find field IDs. Requires "Export data from Lists" permission.',
     {
-      list_id: z.number().int().describe('List ID containing the entry (from get_lists)'),
-      list_entry_id: z.number().int().describe('List entry ID to update (from get_list_entries)'),
+      list_id: z.number().int().min(1).describe('List ID containing the entry (from get_lists)'),
+      list_entry_id: z.number().int().min(1).describe('List entry ID to update (from get_list_entries)'),
       fields: z
         .array(z.object({
-          field_id: z.number().int().describe('Field ID (from get_field_definitions)'),
+          field_id: z.number().int().min(1).describe('Field ID (from get_field_definitions)'),
           value: z.union([z.string(), z.number(), z.boolean(), z.null()]).describe('New field value'),
         }))
         .min(1)
@@ -287,10 +289,10 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
 
   server.tool(
     'get_pipeline_summary',
-    'Summarize a pipeline list by the values of a dropdown field (e.g. deal stage). Returns entry counts per group, sorted by frequency. Use get_lists to find list IDs and get_field_definitions to find field IDs.',
+    'Summarize a pipeline list by the values of a dropdown field (e.g. deal stage). Returns entry counts per group, sorted by frequency. Capped at 500 entries — large lists may be truncated. Use get_lists to find list IDs and get_field_definitions to find field IDs.',
     {
-      list_id: z.number().int().describe('List ID (from get_lists)'),
-      field_id: z.number().int().describe('Field ID to group by (from get_field_definitions) — works best with dropdown fields'),
+      list_id: z.number().int().min(1).describe('List ID (from get_lists)'),
+      field_id: z.number().int().min(1).describe('Field ID to group by (from get_field_definitions) — works best with dropdown fields'),
     },
     async ({ list_id, field_id }) => {
       const values = await api.getFieldValuesByList(list_id, field_id);
@@ -307,10 +309,13 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
       const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
       const fieldName = values[0]?.field?.name ?? `Field ${field_id}`;
       const lines = sorted.map(([label, count]) => `  ${label}: ${count}`);
+      const truncationNote = values.length >= 500
+        ? '\n\n⚠️ Result capped at 500 entries — this list may have more. Summary may be incomplete.'
+        : '';
       return {
         content: [{
           type: 'text',
-          text: `Pipeline summary for list ${list_id} by "${fieldName}" (${values.length} entries total):\n\n${lines.join('\n')}`,
+          text: `Pipeline summary for list ${list_id} by "${fieldName}" (${values.length} entries total):\n\n${lines.join('\n')}${truncationNote}`,
         }],
       };
     }
@@ -320,22 +325,24 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
     'get_saved_view_entries',
     'Fetch list entries through a saved view, respecting its filters and sort order. Use get_saved_views to find view IDs.',
     {
-      list_id: z.number().int().describe('List ID (from get_lists)'),
-      view_id: z.number().int().describe('Saved view ID (from get_saved_views)'),
+      list_id: z.number().int().min(1).describe('List ID (from get_lists)'),
+      view_id: z.number().int().min(1).describe('Saved view ID (from get_saved_views)'),
       limit: z.number().int().min(1).max(100).default(25).describe('Max entries to return'),
       page_token: z.string().optional().describe('Pagination token from a previous call'),
     },
     async ({ list_id, view_id, limit, page_token }) => {
-      const { entries, nextPageToken } = await api.getSavedViewEntries(list_id, view_id, limit, page_token);
-      if (entries.length === 0) {
-        return { content: [{ type: 'text', text: `No entries found in view ${view_id} of list ${list_id}.` }] };
-      }
-      const lines = entries.map(formatEntry);
-      let text = `${entries.length} entries from view ${view_id} of list ${list_id}:\n\n${lines.join('\n')}`;
-      if (nextPageToken) {
-        text += `\n\nMore entries available. Use page_token: "${nextPageToken}"`;
-      }
-      return { content: [{ type: 'text', text }] };
+      try {
+        const { entries, nextPageToken } = await api.getSavedViewEntries(list_id, view_id, limit, page_token);
+        if (entries.length === 0) {
+          return { content: [{ type: 'text', text: `No entries found in view ${view_id} of list ${list_id}.` }] };
+        }
+        const lines = entries.map(formatEntry);
+        let text = `${entries.length} entries from view ${view_id} of list ${list_id}:\n\n${lines.join('\n')}`;
+        if (nextPageToken) {
+          text += `\n\nMore entries available. Use page_token: "${nextPageToken}"`;
+        }
+        return { content: [{ type: 'text', text }] };
+      } catch (e) { return toolError(e); }
     }
   );
 }

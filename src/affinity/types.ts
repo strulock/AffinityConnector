@@ -57,6 +57,12 @@ export interface AffinityList {
   created_at: string;
 }
 
+/**
+ * Paginated search result from the Affinity v2 search endpoints.
+ * - `persons` is populated when searching for people
+ * - `organizations` is populated when searching for companies
+ * Only one field will be non-null per response.
+ */
 export interface AffinitySearchResult<T> {
   persons?: T[];
   organizations?: T[];
