@@ -24,24 +24,21 @@ function formatFragment(f: AffinityTranscriptFragment): string {
 export function registerTranscriptTools(server: McpServer, api: TranscriptsApi): void {
   server.tool(
     'get_transcripts',
-    '(BETA) List call and meeting transcripts from Affinity. Optionally filter by person or organization.',
+    '(BETA) List call and meeting transcripts from Affinity. Filter using Affinity filter syntax (e.g. "id=1" or "createdAt<2025-02-04T10:48:24Z").',
     {
-      person_id: z.number().int().min(1).optional().describe('Filter to transcripts involving this person ID'),
-      organization_id: z.number().int().min(1).optional().describe('Filter to transcripts involving this org ID'),
+      filter: z.string().optional().describe('Filter string (e.g. "id=1" or "createdAt<2025-02-04T10:48:24Z")'),
       limit: z.number().int().min(1).max(100).default(25).describe('Max transcripts to return'),
-      page_token: z.string().optional().describe('Pagination token from a previous call'),
+      cursor: z.string().optional().describe('Pagination cursor from a previous call'),
     },
-    async ({ person_id, organization_id, limit, page_token }) => {
+    async ({ filter, limit, cursor }) => {
       try {
-        const { transcripts, nextPageToken } = await api.getTranscripts({
-          person_id, organization_id, limit, page_token,
-        });
+        const { transcripts, nextCursor } = await api.getTranscripts({ filter, limit, cursor });
         if (transcripts.length === 0) {
           return { content: [{ type: 'text', text: 'No transcripts found.' }] };
         }
         const lines = transcripts.map(formatTranscript);
         let text = `${transcripts.length} transcript(s):\n\n${lines.join('\n')}`;
-        if (nextPageToken) text += `\n\nMore available. Use page_token: "${nextPageToken}"`;
+        if (nextCursor) text += `\n\nMore available. Use cursor: "${nextCursor}"`;
         return { content: [{ type: 'text', text }] };
       } catch (e) { return toolError(e); }
     }

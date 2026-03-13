@@ -29,7 +29,7 @@ describe('get_transcripts tool', () => {
   it('returns formatted transcripts list', async () => {
     const mockApi = {
       ...BASE_API(),
-      getTranscripts: vi.fn().mockResolvedValue({ transcripts: [MOCK_TRANSCRIPT], nextPageToken: undefined }),
+      getTranscripts: vi.fn().mockResolvedValue({ transcripts: [MOCK_TRANSCRIPT], nextCursor: undefined }),
     } as unknown as TranscriptsApi;
     const { server, callTool } = makeMockServer();
     registerTranscriptTools(server, mockApi);
@@ -40,21 +40,30 @@ describe('get_transcripts tool', () => {
     expect(text).toContain('1 transcript');
   });
 
-  it('shows pagination token when available', async () => {
+  it('shows pagination cursor when available', async () => {
     const mockApi = {
       ...BASE_API(),
-      getTranscripts: vi.fn().mockResolvedValue({ transcripts: [MOCK_TRANSCRIPT], nextPageToken: 'tok-tx' }),
+      getTranscripts: vi.fn().mockResolvedValue({ transcripts: [MOCK_TRANSCRIPT], nextCursor: 'cursor-abc' }),
     } as unknown as TranscriptsApi;
     const { server, callTool } = makeMockServer();
     registerTranscriptTools(server, mockApi);
     const result = await callTool('get_transcripts', { limit: 25 });
-    expect(result.content[0].text).toContain('tok-tx');
+    expect(result.content[0].text).toContain('cursor-abc');
+  });
+
+  it('passes filter string to the API', async () => {
+    const mockGetTranscripts = vi.fn().mockResolvedValue({ transcripts: [MOCK_TRANSCRIPT], nextCursor: undefined });
+    const mockApi = { ...BASE_API(), getTranscripts: mockGetTranscripts } as unknown as TranscriptsApi;
+    const { server, callTool } = makeMockServer();
+    registerTranscriptTools(server, mockApi);
+    await callTool('get_transcripts', { filter: 'createdAt>2024-01-01T00:00:00Z', limit: 10 });
+    expect(mockGetTranscripts).toHaveBeenCalledWith(expect.objectContaining({ filter: 'createdAt>2024-01-01T00:00:00Z' }));
   });
 
   it('formats a transcript with null title and no associations', async () => {
     const mockApi = {
       ...BASE_API(),
-      getTranscripts: vi.fn().mockResolvedValue({ transcripts: [MOCK_TRANSCRIPT_NO_TITLE], nextPageToken: undefined }),
+      getTranscripts: vi.fn().mockResolvedValue({ transcripts: [MOCK_TRANSCRIPT_NO_TITLE], nextCursor: undefined }),
     } as unknown as TranscriptsApi;
     const { server, callTool } = makeMockServer();
     registerTranscriptTools(server, mockApi);
@@ -75,7 +84,7 @@ describe('get_transcripts tool', () => {
     };
     const mockApi = {
       ...BASE_API(),
-      getTranscripts: vi.fn().mockResolvedValue({ transcripts: [transcript], nextPageToken: undefined }),
+      getTranscripts: vi.fn().mockResolvedValue({ transcripts: [transcript], nextCursor: undefined }),
     } as unknown as TranscriptsApi;
     const { server, callTool } = makeMockServer();
     registerTranscriptTools(server, mockApi);
@@ -89,7 +98,7 @@ describe('get_transcripts tool', () => {
   it('returns message when no transcripts found', async () => {
     const mockApi = {
       ...BASE_API(),
-      getTranscripts: vi.fn().mockResolvedValue({ transcripts: [], nextPageToken: undefined }),
+      getTranscripts: vi.fn().mockResolvedValue({ transcripts: [], nextCursor: undefined }),
     } as unknown as TranscriptsApi;
     const { server, callTool } = makeMockServer();
     registerTranscriptTools(server, mockApi);
