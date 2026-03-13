@@ -110,13 +110,16 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
     return new Response("Bad Request", { status: 400 });
   }
 
-  if (env.AFFINITY_CACHE && payload.id) {
+  if (env.AFFINITY_CACHE && payload.type) {
     const cache = new KVCache(env.AFFINITY_CACHE);
     const ttl = 7 * 24 * 3600; // 7 days
-    await cache.set(`webhook:event:${payload.id}`, payload, ttl);
+    // Derive a deterministic event ID from type, sent_at, and body.id (if present).
+    const bodyId = typeof payload.body?.id === "number" ? payload.body.id : "";
+    const eventId = `${payload.type}:${payload.sent_at}:${bodyId}`;
+    await cache.set(`webhook:event:${eventId}`, payload, ttl);
     // Update recency index: prepend new ID, deduplicate, cap at 100.
     const recent = (await cache.get<string[]>("webhook:recent")) ?? [];
-    const updated = [payload.id, ...recent.filter(id => id !== payload.id)].slice(0, 100);
+    const updated = [eventId, ...recent.filter(id => id !== eventId)].slice(0, 100);
     await cache.set("webhook:recent", updated, ttl);
   }
 
