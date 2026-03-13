@@ -260,8 +260,8 @@ export interface AffinityWebhookSubscription {
   id: number;
   webhook_url: string;
   subscriptions: string[];
-  state: 'active' | 'inactive';
-  created_at: string;
+  disabled: boolean;
+  created_by: number;
 }
 
 // Webhook event payload stored in KV after receipt

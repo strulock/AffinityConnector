@@ -27,8 +27,8 @@ const MOCK_WEBHOOK: AffinityWebhookSubscription = {
   id: 1,
   webhook_url: 'https://affinity.trulock.com/webhook',
   subscriptions: ['person.created', 'note.created'],
-  state: 'active',
-  created_at: '2024-01-01T00:00:00Z',
+  disabled: false,
+  created_by: 5678,
 };
 
 afterEach(() => vi.unstubAllGlobals());
@@ -75,7 +75,7 @@ describe('create_webhook tool', () => {
   it('creates a webhook and returns confirmation', async () => {
     const api = { ...BASE_MOCK_API(), createWebhook: vi.fn().mockResolvedValue(MOCK_WEBHOOK) };
     const { callTool } = setup(api);
-    const result = await callTool('create_webhook', { subscriptions: ['person.created'] });
+    const result = await callTool('create_webhook', {});
     const text = result.content[0].text;
     expect(text).toContain('Created webhook');
     expect(text).toContain('[id:1]');
@@ -85,35 +85,28 @@ describe('create_webhook tool', () => {
   it('defaults webhook_url to affinity.trulock.com/webhook', async () => {
     const api = { ...BASE_MOCK_API(), createWebhook: vi.fn().mockResolvedValue(MOCK_WEBHOOK) };
     const { callTool } = setup(api);
-    await callTool('create_webhook', { subscriptions: ['note.created'] });
-    expect(api.createWebhook).toHaveBeenCalledWith(expect.objectContaining({
-      webhook_url: 'https://affinity.trulock.com/webhook',
-    }));
+    await callTool('create_webhook', {});
+    expect(api.createWebhook).toHaveBeenCalledWith('https://affinity.trulock.com/webhook');
   });
 
   it('uses the provided webhook_url when supplied', async () => {
     const api = { ...BASE_MOCK_API(), createWebhook: vi.fn().mockResolvedValue(MOCK_WEBHOOK) };
     const { callTool } = setup(api);
-    await callTool('create_webhook', {
-      subscriptions: ['note.created'],
-      webhook_url: 'https://example.com/hook',
-    });
-    expect(api.createWebhook).toHaveBeenCalledWith(expect.objectContaining({
-      webhook_url: 'https://example.com/hook',
-    }));
+    await callTool('create_webhook', { webhook_url: 'https://example.com/hook' });
+    expect(api.createWebhook).toHaveBeenCalledWith('https://example.com/hook');
   });
 });
 
 describe('update_webhook tool', () => {
-  it('returns success with updated state', async () => {
-    const updated = { ...MOCK_WEBHOOK, state: 'inactive' as const };
+  it('returns success with updated disabled flag', async () => {
+    const updated = { ...MOCK_WEBHOOK, disabled: true };
     const api = { ...BASE_MOCK_API(), updateWebhook: vi.fn().mockResolvedValue(updated) };
     const { callTool } = setup(api);
-    const result = await callTool('update_webhook', { webhook_id: 1, state: 'inactive' });
+    const result = await callTool('update_webhook', { webhook_id: 1, disabled: true });
     const text = result.content[0].text;
     expect(text).toContain('Updated webhook');
     expect(text).toContain('[id:1]');
-    expect(text).toContain('inactive');
+    expect(text).toContain('disabled');
   });
 
   it('returns a validation error when no fields are provided', async () => {
