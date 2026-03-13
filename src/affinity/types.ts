@@ -74,6 +74,11 @@ export interface AffinityPaginatedResponse<T> {
   next_page_token?: string | null;
 }
 
+export interface AffinityCursorPaginatedResponse<T> {
+  data: T[];
+  cursor?: string | null;
+}
+
 export interface AffinityOpportunity {
   id: number;
   name: string;

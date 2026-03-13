@@ -15,7 +15,13 @@ const MOCK_FRAGMENT: AffinityTranscriptFragment = {
 
 afterEach(() => vi.unstubAllGlobals());
 
-function mockV2<T>(data: T[], next_page_token: string | null = null) {
+function mockV2WithCursor<T>(data: T[], cursor: string | null = null) {
+  vi.stubGlobal('fetch', vi.fn().mockImplementation(() =>
+    Promise.resolve(new Response(JSON.stringify({ data, cursor }), { status: 200 }))
+  ));
+}
+
+function mockV2WithPageToken<T>(data: T[], next_page_token: string | null = null) {
   vi.stubGlobal('fetch', vi.fn().mockImplementation(() =>
     Promise.resolve(new Response(JSON.stringify({ data, next_page_token }), { status: 200 }))
   ));
@@ -23,18 +29,18 @@ function mockV2<T>(data: T[], next_page_token: string | null = null) {
 
 describe('TranscriptsApi.getTranscripts', () => {
   it('returns transcripts from v2 API', async () => {
-    mockV2([MOCK_TRANSCRIPT]);
+    mockV2WithCursor([MOCK_TRANSCRIPT]);
     const api = new TranscriptsApi(new AffinityClient('key'));
     const result = await api.getTranscripts();
     expect(result.transcripts).toEqual([MOCK_TRANSCRIPT]);
-    expect(result.nextPageToken).toBeUndefined();
+    expect(result.nextCursor).toBeUndefined();
   });
 
-  it('returns nextPageToken when present', async () => {
-    mockV2([MOCK_TRANSCRIPT], 'tok-tx');
+  it('returns nextCursor when present', async () => {
+    mockV2WithCursor([MOCK_TRANSCRIPT], 'tok-tx');
     const api = new TranscriptsApi(new AffinityClient('key'));
     const result = await api.getTranscripts();
-    expect(result.nextPageToken).toBe('tok-tx');
+    expect(result.nextCursor).toBe('tok-tx');
   });
 
   it('returns empty array when data is missing', async () => {
@@ -45,15 +51,26 @@ describe('TranscriptsApi.getTranscripts', () => {
     expect((await api.getTranscripts()).transcripts).toEqual([]);
   });
 
-  it('includes page_token in request when provided', async () => {
+  it('includes cursor in request when provided', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
     );
     vi.stubGlobal('fetch', fetchMock);
     const api = new TranscriptsApi(new AffinityClient('key'));
-    await api.getTranscripts({ page_token: 'my-token' });
+    await api.getTranscripts({ cursor: 'my-cursor' });
     const [url] = fetchMock.mock.calls[0] as [string];
-    expect(url).toContain('page_token=my-token');
+    expect(url).toContain('cursor=my-cursor');
+  });
+
+  it('includes filter in request when provided', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new TranscriptsApi(new AffinityClient('key'));
+    await api.getTranscripts({ filter: 'createdAt>2024-01-01T00:00:00Z' });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(url).toContain('filter=');
   });
 
   it('uses v2 URL and /transcripts path', async () => {
@@ -62,7 +79,7 @@ describe('TranscriptsApi.getTranscripts', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
     const api = new TranscriptsApi(new AffinityClient('key'));
-    await api.getTranscripts({ person_id: 5 });
+    await api.getTranscripts({ limit: 10 });
     const [url] = fetchMock.mock.calls[0] as [string];
     expect(url).toContain('/v2/');
     expect(url).toContain('/transcripts');
@@ -83,7 +100,7 @@ describe('TranscriptsApi.getTranscript', () => {
 
 describe('TranscriptsApi.getTranscriptFragments', () => {
   it('returns fragments for a transcript', async () => {
-    mockV2([MOCK_FRAGMENT]);
+    mockV2WithPageToken([MOCK_FRAGMENT]);
     const api = new TranscriptsApi(new AffinityClient('key'));
     const result = await api.getTranscriptFragments('tx-1');
     expect(result.fragments).toEqual([MOCK_FRAGMENT]);
@@ -91,7 +108,7 @@ describe('TranscriptsApi.getTranscriptFragments', () => {
   });
 
   it('returns nextPageToken when present', async () => {
-    mockV2([MOCK_FRAGMENT], 'tok-frag');
+    mockV2WithPageToken([MOCK_FRAGMENT], 'tok-frag');
     const api = new TranscriptsApi(new AffinityClient('key'));
     const result = await api.getTranscriptFragments('tx-1');
     expect(result.nextPageToken).toBe('tok-frag');
