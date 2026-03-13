@@ -226,27 +226,28 @@ export interface AffinitySemanticResult {
 
 // Transcripts (v2 BETA)
 export interface AffinityTranscriptNote {
+  id: number;
+  type: string;
   content: { html: string };
   creator: { firstName?: string; lastName?: string; emailAddress?: string } | null;
+  createdAt: string;
+  interaction?: { subject?: string } | null;
 }
 
 export interface AffinityTranscript {
   id: number;
-  call_id: string | null;
-  meeting_id: string | null;
-  created_at: string;
-  person_ids: number[];
-  organization_ids: number[];
+  languageCode?: string;
+  createdAt: string;
   note?: AffinityTranscriptNote | null;
 }
 
 export interface AffinityTranscriptFragment {
   id: string;
-  transcript_id: number;
+  transcriptId: number;
   speaker: string | null;
   content: string;
-  startTimestamp: number;
-  endTimestamp: number;
+  startTimestamp?: number | null;
+  endTimestamp?: number | null;
 }
 
 // Merges (v2 deduplication)

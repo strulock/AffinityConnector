@@ -4,13 +4,19 @@ import { TranscriptsApi } from '../../src/affinity/transcripts.js';
 import type { AffinityTranscript, AffinityTranscriptFragment } from '../../src/affinity/types.js';
 
 const MOCK_TRANSCRIPT: AffinityTranscript = {
-  id: 1, call_id: 'call-1', meeting_id: null,
-  created_at: '2024-01-12T10:00:00Z', person_ids: [1], organization_ids: [10],
-  note: { content: { html: '<p>Intro call summary</p>' }, creator: { firstName: 'Alice', lastName: 'Smith', emailAddress: 'alice@example.com' } },
+  id: 1,
+  createdAt: '2024-01-12T10:00:00Z',
+  note: {
+    id: 742, type: 'ai-notetaker',
+    content: { html: '<p>Intro call summary</p>' },
+    creator: { firstName: 'Alice', lastName: 'Smith', emailAddress: 'alice@example.com' },
+    createdAt: '2024-01-12T10:00:00Z',
+    interaction: { subject: 'Weekly Sync' },
+  },
 };
 
 const MOCK_FRAGMENT: AffinityTranscriptFragment = {
-  id: 'frag-1', transcript_id: 1, speaker: 'Alice',
+  id: 'frag-1', transcriptId: 1, speaker: 'Alice',
   content: 'Hello, nice to meet you.', startTimestamp: 0, endTimestamp: 3,
 };
 

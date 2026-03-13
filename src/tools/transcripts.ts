@@ -11,18 +11,16 @@ function stripHtml(html: string): string {
 }
 
 function formatTranscriptSummary(t: AffinityTranscript): string {
-  const summary = t.note?.content?.html ? ` — "${stripHtml(t.note.content.html)}"` : '';
-  const assoc: string[] = [];
-  if (t.person_ids?.length) assoc.push(`people: ${t.person_ids.join(', ')}`);
-  if (t.organization_ids?.length) assoc.push(`orgs: ${t.organization_ids.join(', ')}`);
-  const assocStr = assoc.length ? ` [${assoc.join('; ')}]` : '';
-  return `[transcript:${t.id}] ${t.created_at}${summary}${assocStr}`;
+  const title = t.note?.interaction?.subject
+    ?? (t.note?.content?.html ? stripHtml(t.note.content.html).slice(0, 80) : null)
+    ?? `Transcript from ${t.createdAt}`;
+  return `[transcript:${t.id}] ${title} (${t.createdAt})`;
 }
 
 function formatFragment(f: AffinityTranscriptFragment): string {
   const speaker = f.speaker ? `${f.speaker}: ` : '';
-  const ts = `[${f.startTimestamp.toFixed(1)}s]`;
-  return `${ts} ${speaker}${f.content}`;
+  const ts = typeof f.startTimestamp === 'number' ? `[${f.startTimestamp.toFixed(1)}s] ` : '';
+  return `${ts}${speaker}${f.content}`;
 }
 
 function formatCreator(t: AffinityTranscript): string {

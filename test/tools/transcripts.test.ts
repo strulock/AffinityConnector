@@ -5,19 +5,25 @@ import { makeMockServer } from '../helpers/mock-server.js';
 import type { AffinityTranscript, AffinityTranscriptFragment } from '../../src/affinity/types.js';
 
 const MOCK_TRANSCRIPT: AffinityTranscript = {
-  id: 1, call_id: 'call-1', meeting_id: null,
-  created_at: '2024-01-12T10:00:00Z', person_ids: [1], organization_ids: [10],
-  note: { content: { html: '<p>Intro call</p>' }, creator: { firstName: 'Alice', lastName: 'Smith', emailAddress: 'alice@example.com' } },
+  id: 1,
+  createdAt: '2024-01-12T10:00:00Z',
+  note: {
+    id: 742, type: 'ai-notetaker',
+    content: { html: '<p>Intro call</p>' },
+    creator: { firstName: 'Alice', lastName: 'Smith', emailAddress: 'alice@example.com' },
+    createdAt: '2024-01-12T10:00:00Z',
+    interaction: { subject: 'Weekly Sync' },
+  },
 };
 
 const MOCK_FRAGMENT: AffinityTranscriptFragment = {
-  id: 'frag-1', transcript_id: 1, speaker: 'Alice',
+  id: 'frag-1', transcriptId: 1, speaker: 'Alice',
   content: 'Hello, nice to meet you.', startTimestamp: 0, endTimestamp: 3,
 };
 
 const MOCK_TRANSCRIPT_NO_NOTE: AffinityTranscript = {
-  id: 2, call_id: null, meeting_id: 'mtg-1',
-  created_at: '2024-02-01T10:00:00Z', person_ids: [], organization_ids: [],
+  id: 2,
+  createdAt: '2024-02-01T10:00:00Z',
   note: null,
 };
 
@@ -38,7 +44,7 @@ describe('get_transcripts tool', () => {
     const result = await callTool('get_transcripts', { limit: 20 });
     const text = result.content[0].text;
     expect(text).toContain('[transcript:1]');
-    expect(text).toContain('Intro call');
+    expect(text).toContain('Weekly Sync');
     expect(text).toContain('1 transcript');
   });
 
@@ -76,8 +82,7 @@ describe('get_transcripts tool', () => {
     const result = await callTool('get_transcripts', { limit: 20 });
     const text = result.content[0].text;
     expect(text).toContain('[transcript:2]');
-    expect(text).not.toContain(' — "');
-    expect(text).not.toContain('[people:');
+    expect(text).toContain('Transcript from 2024-02-01T10:00:00Z');
   });
 
   it('returns message when no transcripts found', async () => {
@@ -104,7 +109,7 @@ describe('get_transcript tool', () => {
     const result = await callTool('get_transcript', { transcript_id: 1, limit: 20 });
     const text = result.content[0].text;
     expect(text).toContain('[transcript:1]');
-    expect(text).toContain('Intro call');
+    expect(text).toContain('Weekly Sync');
     expect(text).toContain('Alice');
     expect(text).toContain('Hello, nice to meet you.');
     expect(text).toContain('[0.0s]');
@@ -120,6 +125,24 @@ describe('get_transcript tool', () => {
     registerTranscriptTools(server, mockApi);
     const result = await callTool('get_transcript', { transcript_id: 1, limit: 20 });
     expect(result.content[0].text).toContain('Alice Smith');
+  });
+
+  it('formats a fragment with missing startTimestamp gracefully', async () => {
+    const fragmentNoTs: AffinityTranscriptFragment = {
+      ...MOCK_FRAGMENT, id: 'frag-ts', startTimestamp: null, endTimestamp: null, content: 'No timestamp.',
+    };
+    const mockApi = {
+      ...BASE_API(),
+      getTranscript: vi.fn().mockResolvedValue(MOCK_TRANSCRIPT),
+      getTranscriptFragments: vi.fn().mockResolvedValue({ fragments: [fragmentNoTs], nextCursor: undefined }),
+    } as unknown as TranscriptsApi;
+    const { server, callTool } = makeMockServer();
+    registerTranscriptTools(server, mockApi);
+    const result = await callTool('get_transcript', { transcript_id: 1, limit: 20 });
+    const text = result.content[0].text;
+    expect(text).toContain('No timestamp.');
+    expect(text).not.toContain('NaN');
+    expect(text).not.toContain('[null');
   });
 
   it('formats a fragment with no speaker', async () => {
@@ -178,6 +201,7 @@ describe('get_transcript_info tool', () => {
     expect(text).toContain('[transcript:1]');
     expect(text).toContain('Summary:');
     expect(text).toContain('Intro call');
+    expect(text).toContain('Weekly Sync');
     expect(text).toContain('Alice Smith');
   });
 
