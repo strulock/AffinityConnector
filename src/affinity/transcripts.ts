@@ -1,7 +1,16 @@
 // Affinity v2 transcript endpoints (BETA): /transcripts, /transcripts/{id}/fragments
 
 import { AffinityClient } from './client.js';
-import type { AffinityTranscript, AffinityTranscriptFragment, AffinityCursorPaginatedResponse, AffinityPaginatedResponse } from './types.js';
+import type { AffinityTranscript, AffinityTranscriptFragment, AffinityCursorPaginatedResponse } from './types.js';
+
+function cursorFromNextUrl(nextUrl?: string | null): string | undefined {
+  if (!nextUrl) return undefined;
+  try {
+    return new URL(nextUrl).searchParams.get('cursor') ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 export class TranscriptsApi {
   constructor(private client: AffinityClient) {}
@@ -10,7 +19,7 @@ export class TranscriptsApi {
   async getTranscripts(
     params: { filter?: string; limit?: number; cursor?: string } = {},
   ): Promise<{ transcripts: AffinityTranscript[]; nextCursor?: string }> {
-    const { limit = 25, cursor, filter } = params;
+    const { limit = 20, cursor, filter } = params;
     const q: Record<string, unknown> = { limit };
     if (cursor) q.cursor = cursor;
     if (filter) q.filter = filter;
@@ -22,35 +31,35 @@ export class TranscriptsApi {
     );
     return {
       transcripts: result.data ?? [],
-      nextCursor: result.cursor ?? undefined,
+      nextCursor: cursorFromNextUrl(result.pagination?.nextUrl),
     };
   }
 
   /** Get metadata for a single transcript (v2 GET /transcripts/{id}). */
-  async getTranscript(transcriptId: string): Promise<AffinityTranscript> {
+  async getTranscript(transcriptId: number): Promise<AffinityTranscript> {
     return this.client.get<AffinityTranscript>(`/transcripts/${transcriptId}`, undefined, 'v2');
   }
 
   /**
    * Get content fragments for a transcript (v2 GET /transcripts/{id}/fragments).
-   * Defaults to 100 fragments per page; paginate for long transcripts.
+   * Defaults to 20 fragments per page; paginate for long transcripts.
    */
   async getTranscriptFragments(
-    transcriptId: string,
-    params: { limit?: number; page_token?: string } = {},
-  ): Promise<{ fragments: AffinityTranscriptFragment[]; nextPageToken?: string }> {
-    const { limit = 100, page_token } = params;
-    const q: Record<string, unknown> = { page_size: limit };
-    if (page_token) q.page_token = page_token;
+    transcriptId: number,
+    params: { limit?: number; cursor?: string } = {},
+  ): Promise<{ fragments: AffinityTranscriptFragment[]; nextCursor?: string }> {
+    const { limit = 20, cursor } = params;
+    const q: Record<string, unknown> = { limit };
+    if (cursor) q.cursor = cursor;
 
-    const result = await this.client.get<AffinityPaginatedResponse<AffinityTranscriptFragment>>(
+    const result = await this.client.get<AffinityCursorPaginatedResponse<AffinityTranscriptFragment>>(
       `/transcripts/${transcriptId}/fragments`,
       q,
       'v2',
     );
     return {
       fragments: result.data ?? [],
-      nextPageToken: result.next_page_token ?? undefined,
+      nextCursor: cursorFromNextUrl(result.pagination?.nextUrl),
     };
   }
 }

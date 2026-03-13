@@ -76,7 +76,7 @@ export interface AffinityPaginatedResponse<T> {
 
 export interface AffinityCursorPaginatedResponse<T> {
   data: T[];
-  cursor?: string | null;
+  pagination?: { nextUrl?: string | null };
 }
 
 export interface AffinityOpportunity {
@@ -225,23 +225,28 @@ export interface AffinitySemanticResult {
 }
 
 // Transcripts (v2 BETA)
+export interface AffinityTranscriptNote {
+  content: { html: string };
+  creator: { firstName?: string; lastName?: string; emailAddress?: string } | null;
+}
+
 export interface AffinityTranscript {
-  id: string;
-  title: string | null;
+  id: number;
   call_id: string | null;
   meeting_id: string | null;
   created_at: string;
   person_ids: number[];
   organization_ids: number[];
+  note?: AffinityTranscriptNote | null;
 }
 
 export interface AffinityTranscriptFragment {
   id: string;
-  transcript_id: string;
-  speaker_label: string | null;
+  transcript_id: number;
+  speaker: string | null;
   content: string;
-  start_ms: number;
-  end_ms: number;
+  startTimestamp: number;
+  endTimestamp: number;
 }
 
 // Merges (v2 deduplication)

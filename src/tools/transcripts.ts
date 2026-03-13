@@ -6,29 +6,41 @@ import { TranscriptsApi } from '../affinity/transcripts.js';
 import { toolError } from './_error.js';
 import type { AffinityTranscript, AffinityTranscriptFragment } from '../affinity/types.js';
 
-function formatTranscript(t: AffinityTranscript): string {
-  const title = t.title ? ` — "${t.title}"` : '';
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+}
+
+function formatTranscriptSummary(t: AffinityTranscript): string {
+  const summary = t.note?.content?.html ? ` — "${stripHtml(t.note.content.html)}"` : '';
   const assoc: string[] = [];
   if (t.person_ids?.length) assoc.push(`people: ${t.person_ids.join(', ')}`);
   if (t.organization_ids?.length) assoc.push(`orgs: ${t.organization_ids.join(', ')}`);
   const assocStr = assoc.length ? ` [${assoc.join('; ')}]` : '';
-  return `[transcript:${t.id}] ${t.created_at}${title}${assocStr}`;
+  return `[transcript:${t.id}] ${t.created_at}${summary}${assocStr}`;
 }
 
 function formatFragment(f: AffinityTranscriptFragment): string {
-  const speaker = f.speaker_label ? `${f.speaker_label}: ` : '';
-  const ts = `[${(f.start_ms / 1000).toFixed(1)}s]`;
+  const speaker = f.speaker ? `${f.speaker}: ` : '';
+  const ts = `[${f.startTimestamp.toFixed(1)}s]`;
   return `${ts} ${speaker}${f.content}`;
+}
+
+function formatCreator(t: AffinityTranscript): string {
+  const c = t.note?.creator;
+  if (!c) return '';
+  const name = [c.firstName, c.lastName].filter(Boolean).join(' ');
+  const email = c.emailAddress ? ` <${c.emailAddress}>` : '';
+  return name || email ? `\nCreator: ${name}${email}` : '';
 }
 
 export function registerTranscriptTools(server: McpServer, api: TranscriptsApi): void {
   server.tool(
     'get_transcripts',
-    '(BETA) List call and meeting transcripts from Affinity. Filter using Affinity filter syntax (e.g. "id=1" or "createdAt<2025-02-04T10:48:24Z").',
+    '(BETA) List call and meeting transcripts from Affinity with AI summaries. Filter using Affinity filter syntax (e.g. "id=1" or "createdAt<2025-02-04T10:48:24Z").',
     {
       filter: z.string().optional().describe('Filter string (e.g. "id=1" or "createdAt<2025-02-04T10:48:24Z")'),
-      limit: z.number().int().min(1).max(100).default(25).describe('Max transcripts to return'),
-      cursor: z.string().optional().describe('Pagination cursor from a previous call'),
+      limit: z.number().int().min(1).max(100).default(20).describe('Number of transcripts per page'),
+      cursor: z.string().optional().describe('Pagination cursor from a previous response'),
     },
     async ({ filter, limit, cursor }) => {
       try {
@@ -36,7 +48,7 @@ export function registerTranscriptTools(server: McpServer, api: TranscriptsApi):
         if (transcripts.length === 0) {
           return { content: [{ type: 'text', text: 'No transcripts found.' }] };
         }
-        const lines = transcripts.map(formatTranscript);
+        const lines = transcripts.map(formatTranscriptSummary);
         let text = `${transcripts.length} transcript(s):\n\n${lines.join('\n')}`;
         if (nextCursor) text += `\n\nMore available. Use cursor: "${nextCursor}"`;
         return { content: [{ type: 'text', text }] };
@@ -46,27 +58,46 @@ export function registerTranscriptTools(server: McpServer, api: TranscriptsApi):
 
   server.tool(
     'get_transcript',
-    '(BETA) Get the full content of an Affinity transcript including all speaker fragments. Use get_transcripts to find transcript IDs.',
+    '(BETA) Get the full content of an Affinity transcript with speaker dialogue. Use get_transcripts to find transcript IDs.',
     {
-      transcript_id: z.string().describe('Transcript ID (from get_transcripts)'),
-      limit: z.number().int().min(1).max(500).default(100).describe('Max fragments to return'),
-      page_token: z.string().optional().describe('Pagination token for long transcripts'),
+      transcript_id: z.number().int().describe('Transcript ID (from get_transcripts)'),
+      limit: z.number().int().min(1).max(100).default(20).describe('Max fragments per page'),
+      cursor: z.string().optional().describe('Pagination cursor for long transcripts'),
     },
-    async ({ transcript_id, limit, page_token }) => {
+    async ({ transcript_id, limit, cursor }) => {
       try {
-        const [transcript, { fragments, nextPageToken }] = await Promise.all([
+        const [transcript, { fragments, nextCursor }] = await Promise.all([
           api.getTranscript(transcript_id),
-          api.getTranscriptFragments(transcript_id, { limit, page_token }),
+          api.getTranscriptFragments(transcript_id, { limit, cursor }),
         ]);
 
-        const header = formatTranscript(transcript);
+        const header = formatTranscriptSummary(transcript) + formatCreator(transcript);
         if (fragments.length === 0) {
           return { content: [{ type: 'text', text: `${header}\n\nNo transcript content available.` }] };
         }
         const lines = fragments.map(formatFragment);
         let text = `${header}\n\n${lines.join('\n')}`;
-        if (nextPageToken) text += `\n\nMore content available. Use page_token: "${nextPageToken}"`;
+        if (nextCursor) text += `\n\nMore content available. Use cursor: "${nextCursor}"`;
         return { content: [{ type: 'text', text }] };
+      } catch (e) { return toolError(e); }
+    }
+  );
+
+  server.tool(
+    'get_transcript_info',
+    '(BETA) Get transcript metadata, AI summary, and creator info. Use get_transcripts to find transcript IDs.',
+    {
+      transcript_id: z.number().int().describe('Transcript ID'),
+    },
+    async ({ transcript_id }) => {
+      try {
+        const transcript = await api.getTranscript(transcript_id);
+        const lines: string[] = [formatTranscriptSummary(transcript)];
+        const creator = formatCreator(transcript);
+        if (creator) lines.push(creator.trimStart());
+        const summary = transcript.note?.content?.html ? stripHtml(transcript.note.content.html) : null;
+        if (summary) lines.push(`\nSummary:\n${summary}`);
+        return { content: [{ type: 'text', text: lines.join('\n') }] };
       } catch (e) { return toolError(e); }
     }
   );

@@ -4,40 +4,35 @@ import { TranscriptsApi } from '../../src/affinity/transcripts.js';
 import type { AffinityTranscript, AffinityTranscriptFragment } from '../../src/affinity/types.js';
 
 const MOCK_TRANSCRIPT: AffinityTranscript = {
-  id: 'tx-1', title: 'Intro call', call_id: 'call-1', meeting_id: null,
+  id: 1, call_id: 'call-1', meeting_id: null,
   created_at: '2024-01-12T10:00:00Z', person_ids: [1], organization_ids: [10],
+  note: { content: { html: '<p>Intro call summary</p>' }, creator: { firstName: 'Alice', lastName: 'Smith', emailAddress: 'alice@example.com' } },
 };
 
 const MOCK_FRAGMENT: AffinityTranscriptFragment = {
-  id: 'frag-1', transcript_id: 'tx-1', speaker_label: 'Alice',
-  content: 'Hello, nice to meet you.', start_ms: 0, end_ms: 3000,
+  id: 'frag-1', transcript_id: 1, speaker: 'Alice',
+  content: 'Hello, nice to meet you.', startTimestamp: 0, endTimestamp: 3,
 };
 
 afterEach(() => vi.unstubAllGlobals());
 
-function mockV2WithCursor<T>(data: T[], cursor: string | null = null) {
+function mockV2WithPagination<T>(data: T[], nextUrl: string | null = null) {
   vi.stubGlobal('fetch', vi.fn().mockImplementation(() =>
-    Promise.resolve(new Response(JSON.stringify({ data, cursor }), { status: 200 }))
-  ));
-}
-
-function mockV2WithPageToken<T>(data: T[], next_page_token: string | null = null) {
-  vi.stubGlobal('fetch', vi.fn().mockImplementation(() =>
-    Promise.resolve(new Response(JSON.stringify({ data, next_page_token }), { status: 200 }))
+    Promise.resolve(new Response(JSON.stringify({ data, pagination: nextUrl ? { nextUrl } : {} }), { status: 200 }))
   ));
 }
 
 describe('TranscriptsApi.getTranscripts', () => {
   it('returns transcripts from v2 API', async () => {
-    mockV2WithCursor([MOCK_TRANSCRIPT]);
+    mockV2WithPagination([MOCK_TRANSCRIPT]);
     const api = new TranscriptsApi(new AffinityClient('key'));
     const result = await api.getTranscripts();
     expect(result.transcripts).toEqual([MOCK_TRANSCRIPT]);
     expect(result.nextCursor).toBeUndefined();
   });
 
-  it('returns nextCursor when present', async () => {
-    mockV2WithCursor([MOCK_TRANSCRIPT], 'tok-tx');
+  it('returns nextCursor parsed from pagination.nextUrl', async () => {
+    mockV2WithPagination([MOCK_TRANSCRIPT], 'https://api.affinity.co/v2/transcripts?cursor=tok-tx&limit=20');
     const api = new TranscriptsApi(new AffinityClient('key'));
     const result = await api.getTranscripts();
     expect(result.nextCursor).toBe('tok-tx');
@@ -73,7 +68,7 @@ describe('TranscriptsApi.getTranscripts', () => {
     expect(url).toContain('filter=');
   });
 
-  it('uses v2 URL and /transcripts path', async () => {
+  it('uses v2 URL and /transcripts path with limit param', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
     );
@@ -83,6 +78,7 @@ describe('TranscriptsApi.getTranscripts', () => {
     const [url] = fetchMock.mock.calls[0] as [string];
     expect(url).toContain('/v2/');
     expect(url).toContain('/transcripts');
+    expect(url).toContain('limit=10');
   });
 });
 
@@ -92,37 +88,37 @@ describe('TranscriptsApi.getTranscript', () => {
       Promise.resolve(new Response(JSON.stringify(MOCK_TRANSCRIPT), { status: 200 }))
     ));
     const api = new TranscriptsApi(new AffinityClient('key'));
-    const result = await api.getTranscript('tx-1');
-    expect(result.id).toBe('tx-1');
-    expect(result.title).toBe('Intro call');
+    const result = await api.getTranscript(1);
+    expect(result.id).toBe(1);
+    expect(result.note?.content.html).toBe('<p>Intro call summary</p>');
   });
 });
 
 describe('TranscriptsApi.getTranscriptFragments', () => {
   it('returns fragments for a transcript', async () => {
-    mockV2WithPageToken([MOCK_FRAGMENT]);
+    mockV2WithPagination([MOCK_FRAGMENT]);
     const api = new TranscriptsApi(new AffinityClient('key'));
-    const result = await api.getTranscriptFragments('tx-1');
+    const result = await api.getTranscriptFragments(1);
     expect(result.fragments).toEqual([MOCK_FRAGMENT]);
-    expect(result.nextPageToken).toBeUndefined();
+    expect(result.nextCursor).toBeUndefined();
   });
 
-  it('returns nextPageToken when present', async () => {
-    mockV2WithPageToken([MOCK_FRAGMENT], 'tok-frag');
+  it('returns nextCursor parsed from pagination.nextUrl', async () => {
+    mockV2WithPagination([MOCK_FRAGMENT], 'https://api.affinity.co/v2/transcripts/1/fragments?cursor=tok-frag&limit=20');
     const api = new TranscriptsApi(new AffinityClient('key'));
-    const result = await api.getTranscriptFragments('tx-1');
-    expect(result.nextPageToken).toBe('tok-frag');
+    const result = await api.getTranscriptFragments(1);
+    expect(result.nextCursor).toBe('tok-frag');
   });
 
-  it('includes page_token in request when provided', async () => {
+  it('includes cursor in request when provided', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
     );
     vi.stubGlobal('fetch', fetchMock);
     const api = new TranscriptsApi(new AffinityClient('key'));
-    await api.getTranscriptFragments('tx-1', { page_token: 'frag-tok' });
+    await api.getTranscriptFragments(1, { cursor: 'frag-tok' });
     const [url] = fetchMock.mock.calls[0] as [string];
-    expect(url).toContain('page_token=frag-tok');
+    expect(url).toContain('cursor=frag-tok');
   });
 
   it('returns empty array when data is null', async () => {
@@ -130,18 +126,19 @@ describe('TranscriptsApi.getTranscriptFragments', () => {
       Promise.resolve(new Response(JSON.stringify({ data: null }), { status: 200 }))
     ));
     const api = new TranscriptsApi(new AffinityClient('key'));
-    expect((await api.getTranscriptFragments('tx-1')).fragments).toEqual([]);
+    expect((await api.getTranscriptFragments(1)).fragments).toEqual([]);
   });
 
-  it('uses v2 URL with /fragments path', async () => {
+  it('uses v2 URL with /fragments path and limit param', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
     );
     vi.stubGlobal('fetch', fetchMock);
     const api = new TranscriptsApi(new AffinityClient('key'));
-    await api.getTranscriptFragments('tx-1');
+    await api.getTranscriptFragments(1);
     const [url] = fetchMock.mock.calls[0] as [string];
     expect(url).toContain('/v2/');
-    expect(url).toContain('/transcripts/tx-1/fragments');
+    expect(url).toContain('/transcripts/1/fragments');
+    expect(url).toContain('limit=');
   });
 });
