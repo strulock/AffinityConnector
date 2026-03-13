@@ -135,13 +135,22 @@ export function registerWebhookTools(
         return { content: [{ type: 'text', text: 'No events match the specified filters.' }] };
       }
 
+      const formatTime = (ts: number) => new Date(ts * 1000).toISOString();
+      const formatBase = (e: AffinityWebhookEvent) => {
+        const entityId = typeof e.body.id === 'number' ? e.body.id
+          : typeof e.body.entity_id === 'number' ? e.body.entity_id
+          : null;
+        const idPart = entityId !== null ? ` — entity:${entityId}` : '';
+        return `[${e.type}] ${formatTime(e.sent_at)}${idPart}`;
+      };
+
       if (enrich) {
         const ENRICH_LIMIT = 5;
         const toEnrich = limited.slice(0, ENRICH_LIMIT);
         const rest = limited.slice(ENRICH_LIMIT);
 
         const enrichedLines = await Promise.all(toEnrich.map(async e => {
-          const baseText = `[${e.type}] ${e.created_at} — id:${e.id}`;
+          const baseText = formatBase(e);
           const entityId = typeof e.body.id === 'number' ? e.body.id
             : typeof e.body.entity_id === 'number' ? e.body.entity_id
             : null;
@@ -163,14 +172,14 @@ export function registerWebhookTools(
           return baseText;
         }));
 
-        const restLines = rest.map(e => `[${e.type}] ${e.created_at} — id:${e.id}`);
+        const restLines = rest.map(formatBase);
         const allLines = [...enrichedLines, ...restLines];
         return {
           content: [{ type: 'text', text: `${limited.length} event(s):\n\n${allLines.join('\n')}` }],
         };
       }
 
-      const lines = limited.map(e => `[${e.type}] ${e.created_at} — id:${e.id}`);
+      const lines = limited.map(formatBase);
       return {
         content: [{ type: 'text', text: `${limited.length} event(s):\n\n${lines.join('\n')}` }],
       };

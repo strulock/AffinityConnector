@@ -276,10 +276,9 @@ export interface AffinityWebhookSubscription {
 
 // Webhook event payload stored in KV after receipt
 export interface AffinityWebhookEvent {
-  id: string;
   type: string;
   body: Record<string, unknown>;
-  created_at: string;
+  sent_at: number;
 }
 
 // Utility

@@ -129,6 +129,8 @@ describe('delete_webhook tool', () => {
 });
 
 describe('get_recent_events tool', () => {
+  const SENT_AT = 1631120151;
+
   it('returns a message when no events have been received', async () => {
     const { callTool } = setup();
     const result = await callTool('get_recent_events', {});
@@ -138,22 +140,22 @@ describe('get_recent_events tool', () => {
   it('returns formatted events from KV', async () => {
     const kv = makeKVMock();
     const cache = new KVCache(kv);
-    const event = { id: 'evt-1', type: 'person.created', body: { id: 42 }, created_at: '2024-01-15T10:00:00Z' };
+    const event = { type: 'person.created', body: { id: 42 }, sent_at: SENT_AT };
     await cache.set('webhook:event:evt-1', event, 600);
     await cache.set('webhook:recent', ['evt-1'], 600);
     const { callTool } = setup(undefined, cache);
     const result = await callTool('get_recent_events', {});
     const text = result.content[0].text;
     expect(text).toContain('person.created');
-    expect(text).toContain('evt-1');
+    expect(text).toContain('entity:42');
     expect(text).toContain('1 event');
   });
 
   it('filters by event_type', async () => {
     const kv = makeKVMock();
     const cache = new KVCache(kv);
-    const event1 = { id: 'evt-1', type: 'person.created', body: {}, created_at: '2024-01-15T10:00:00Z' };
-    const event2 = { id: 'evt-2', type: 'note.created', body: {}, created_at: '2024-01-16T10:00:00Z' };
+    const event1 = { type: 'person.created', body: {}, sent_at: SENT_AT };
+    const event2 = { type: 'note.created', body: {}, sent_at: SENT_AT + 1 };
     await cache.set('webhook:event:evt-1', event1, 600);
     await cache.set('webhook:event:evt-2', event2, 600);
     await cache.set('webhook:recent', ['evt-2', 'evt-1'], 600);
@@ -166,7 +168,7 @@ describe('get_recent_events tool', () => {
   it('filters by entity_id using body.id', async () => {
     const kv = makeKVMock();
     const cache = new KVCache(kv);
-    const event = { id: 'evt-1', type: 'person.created', body: { id: 42 }, created_at: '2024-01-15T10:00:00Z' };
+    const event = { type: 'person.created', body: { id: 42 }, sent_at: SENT_AT };
     await cache.set('webhook:event:evt-1', event, 600);
     await cache.set('webhook:recent', ['evt-1'], 600);
     const { callTool } = setup(undefined, cache);
@@ -179,7 +181,7 @@ describe('get_recent_events tool', () => {
   it('filters by entity_id using body.entity_id', async () => {
     const kv = makeKVMock();
     const cache = new KVCache(kv);
-    const event = { id: 'evt-1', type: 'field_value.created', body: { entity_id: 55 }, created_at: '2024-01-15T10:00:00Z' };
+    const event = { type: 'field_value.created', body: { entity_id: 55 }, sent_at: SENT_AT };
     await cache.set('webhook:event:evt-1', event, 600);
     await cache.set('webhook:recent', ['evt-1'], 600);
     const { callTool } = setup(undefined, cache);
@@ -194,7 +196,7 @@ describe('get_recent_events tool', () => {
     for (let i = 0; i < 5; i++) {
       const id = `evt-${i}`;
       ids.push(id);
-      await cache.set(`webhook:event:${id}`, { id, type: 'person.updated', body: {}, created_at: '2024-01-15T10:00:00Z' }, 600);
+      await cache.set(`webhook:event:${id}`, { type: 'person.updated', body: {}, sent_at: SENT_AT + i }, 600);
     }
     await cache.set('webhook:recent', ids, 600);
     const { callTool } = setup(undefined, cache);
@@ -214,7 +216,7 @@ describe('get_recent_events tool', () => {
   it('enriches person events with name and email when enrich=true', async () => {
     const kv = makeKVMock();
     const cache = new KVCache(kv);
-    const event = { id: 'evt-1', type: 'person.created', body: { id: 42 }, created_at: '2024-01-15T10:00:00Z' };
+    const event = { type: 'person.created', body: { id: 42 }, sent_at: SENT_AT };
     await cache.set('webhook:event:evt-1', event, 600);
     await cache.set('webhook:recent', ['evt-1'], 600);
     const peopleApi = { getById: vi.fn().mockResolvedValue(MOCK_PERSON) } as unknown as PeopleApi;
@@ -229,7 +231,7 @@ describe('get_recent_events tool', () => {
   it('enriches organization events with org name when enrich=true', async () => {
     const kv = makeKVMock();
     const cache = new KVCache(kv);
-    const event = { id: 'evt-2', type: 'organization.updated', body: { id: 99 }, created_at: '2024-01-16T10:00:00Z' };
+    const event = { type: 'organization.updated', body: { id: 99 }, sent_at: SENT_AT };
     await cache.set('webhook:event:evt-2', event, 600);
     await cache.set('webhook:recent', ['evt-2'], 600);
     const mockPeople = { getById: vi.fn() } as unknown as PeopleApi;
@@ -243,7 +245,7 @@ describe('get_recent_events tool', () => {
   it('falls back to base format when entity lookup fails during enrichment', async () => {
     const kv = makeKVMock();
     const cache = new KVCache(kv);
-    const event = { id: 'evt-3', type: 'person.updated', body: { id: 999 }, created_at: '2024-01-17T10:00:00Z' };
+    const event = { type: 'person.updated', body: { id: 999 }, sent_at: SENT_AT };
     await cache.set('webhook:event:evt-3', event, 600);
     await cache.set('webhook:recent', ['evt-3'], 600);
     const peopleApi = { getById: vi.fn().mockRejectedValue(new Error('Not found')) } as unknown as PeopleApi;
@@ -251,7 +253,7 @@ describe('get_recent_events tool', () => {
     const result = await callTool('get_recent_events', { enrich: true });
     // Should still return the event, just without enrichment detail
     expect(result.content[0].text).toContain('person.updated');
-    expect(result.content[0].text).toContain('evt-3');
+    expect(result.content[0].text).toContain('entity:999');
     expect(result.content[0].text).not.toContain('→');
   });
 
@@ -260,7 +262,7 @@ describe('get_recent_events tool', () => {
     const cache = new KVCache(kv);
     for (let i = 0; i < 7; i++) {
       const id = `evt-${i}`;
-      await cache.set(`webhook:event:${id}`, { id, type: 'person.created', body: { id: i }, created_at: '2024-01-15T10:00:00Z' }, 600);
+      await cache.set(`webhook:event:${id}`, { type: 'person.created', body: { id: i }, sent_at: SENT_AT + i }, 600);
     }
     await cache.set('webhook:recent', ['evt-0','evt-1','evt-2','evt-3','evt-4','evt-5','evt-6'], 600);
     const peopleApi = { getById: vi.fn().mockResolvedValue(MOCK_PERSON) } as unknown as PeopleApi;
@@ -272,7 +274,7 @@ describe('get_recent_events tool', () => {
   it('uses body.entity_id as entity ID when body.id is not a number', async () => {
     const kv = makeKVMock();
     const cache = new KVCache(kv);
-    const event = { id: 'evt-eid', type: 'person.created', body: { entity_id: 42 }, created_at: '2024-01-18T10:00:00Z' };
+    const event = { type: 'person.created', body: { entity_id: 42 }, sent_at: SENT_AT };
     await cache.set('webhook:event:evt-eid', event, 600);
     await cache.set('webhook:recent', ['evt-eid'], 600);
     const peopleApi = { getById: vi.fn().mockResolvedValue(MOCK_PERSON) } as unknown as PeopleApi;
@@ -285,7 +287,7 @@ describe('get_recent_events tool', () => {
   it('returns base text when event body has no numeric id or entity_id', async () => {
     const kv = makeKVMock();
     const cache = new KVCache(kv);
-    const event = { id: 'evt-noid', type: 'person.created', body: {}, created_at: '2024-01-19T10:00:00Z' };
+    const event = { type: 'person.created', body: {}, sent_at: SENT_AT };
     await cache.set('webhook:event:evt-noid', event, 600);
     await cache.set('webhook:recent', ['evt-noid'], 600);
     const peopleApi = { getById: vi.fn() } as unknown as PeopleApi;
@@ -298,7 +300,7 @@ describe('get_recent_events tool', () => {
   it('returns base format for non-person/non-org event types when enrich=true', async () => {
     const kv = makeKVMock();
     const cache = new KVCache(kv);
-    const event = { id: 'evt-note', type: 'note.created', body: { id: 5 }, created_at: '2024-01-20T10:00:00Z' };
+    const event = { type: 'note.created', body: { id: 5 }, sent_at: SENT_AT };
     await cache.set('webhook:event:evt-note', event, 600);
     await cache.set('webhook:recent', ['evt-note'], 600);
     const peopleApi = { getById: vi.fn() } as unknown as PeopleApi;
@@ -311,7 +313,7 @@ describe('get_recent_events tool', () => {
   it('shows "(no name)" and "no email" fallbacks in person enrichment', async () => {
     const kv = makeKVMock();
     const cache = new KVCache(kv);
-    const event = { id: 'evt-noname', type: 'person.created', body: { id: 42 }, created_at: '2024-01-21T10:00:00Z' };
+    const event = { type: 'person.created', body: { id: 42 }, sent_at: SENT_AT };
     await cache.set('webhook:event:evt-noname', event, 600);
     await cache.set('webhook:recent', ['evt-noname'], 600);
     const noNamePerson = { ...MOCK_PERSON, first_name: '', last_name: '', primary_email: null as unknown as string };
@@ -325,7 +327,7 @@ describe('get_recent_events tool', () => {
   it('does not call people/org APIs when enrich is false (default)', async () => {
     const kv = makeKVMock();
     const cache = new KVCache(kv);
-    const event = { id: 'evt-1', type: 'person.created', body: { id: 42 }, created_at: '2024-01-15T10:00:00Z' };
+    const event = { type: 'person.created', body: { id: 42 }, sent_at: SENT_AT };
     await cache.set('webhook:event:evt-1', event, 600);
     await cache.set('webhook:recent', ['evt-1'], 600);
     const peopleApi = { getById: vi.fn() } as unknown as PeopleApi;
