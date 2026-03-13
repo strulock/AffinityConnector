@@ -22,7 +22,7 @@ export function registerOpportunityTools(server: McpServer, api: OpportunitiesAp
     'Search Affinity opportunities (deals) by name. Omit term to list all. Optionally scope to a specific list with list_id.',
     {
       term: z.string().optional().describe('Name search term. Omit to list all opportunities.'),
-      list_id: z.number().int().min(1).optional().describe('Scope results to a specific list ID (from get_lists).'),
+      list_id: z.coerce.number().int().min(1).optional().describe('Scope results to a specific list ID (from get_lists).'),
     },
     async ({ term, list_id }) => {
       const opps = await api.search(term, list_id);
@@ -41,7 +41,7 @@ export function registerOpportunityTools(server: McpServer, api: OpportunitiesAp
     'get_opportunity',
     'Get full details for an Affinity opportunity by ID, including associated people, organizations, and list memberships.',
     {
-      opportunity_id: z.number().int().min(1).describe('Opportunity ID (from search_opportunities or get_list_entries)'),
+      opportunity_id: z.coerce.number().int().min(1).describe('Opportunity ID (from search_opportunities or get_list_entries)'),
     },
     async ({ opportunity_id }) => {
       try {
@@ -70,8 +70,8 @@ export function registerOpportunityTools(server: McpServer, api: OpportunitiesAp
     'Create a new Affinity opportunity (deal). Optionally associate people and organizations at creation time. Use add_to_list to add to a pipeline list after creation.',
     {
       name: z.string().describe('Opportunity name'),
-      person_ids: z.array(z.number().int()).optional().describe('Person IDs to associate with this opportunity'),
-      organization_ids: z.array(z.number().int()).optional().describe('Organization IDs to associate with this opportunity'),
+      person_ids: z.array(z.coerce.number().int()).optional().describe('Person IDs to associate with this opportunity'),
+      organization_ids: z.array(z.coerce.number().int()).optional().describe('Organization IDs to associate with this opportunity'),
     },
     async ({ name, person_ids, organization_ids }) => {
       try {
@@ -90,7 +90,7 @@ export function registerOpportunityTools(server: McpServer, api: OpportunitiesAp
     'delete_opportunity',
     'DESTRUCTIVE — permanently delete an Affinity opportunity record by ID. This cannot be undone. All associated list entries and field values will also be removed. Confirm with the user before calling.',
     {
-      opportunity_id: z.number().int().min(1).describe('ID of the opportunity to delete'),
+      opportunity_id: z.coerce.number().int().min(1).describe('ID of the opportunity to delete'),
     },
     async ({ opportunity_id }) => {
       try {
@@ -106,10 +106,10 @@ export function registerOpportunityTools(server: McpServer, api: OpportunitiesAp
     'update_opportunity',
     'Update an existing Affinity opportunity — rename it or replace its associated people and organizations. Note: person_ids and organization_ids replace the full current list.',
     {
-      opportunity_id: z.number().int().min(1).describe('Opportunity ID to update'),
+      opportunity_id: z.coerce.number().int().min(1).describe('Opportunity ID to update'),
       name: z.string().optional().describe('New name'),
-      person_ids: z.array(z.number().int()).optional().describe('Replacement list of person IDs (replaces current associations)'),
-      organization_ids: z.array(z.number().int()).optional().describe('Replacement list of organization IDs (replaces current associations)'),
+      person_ids: z.array(z.coerce.number().int()).optional().describe('Replacement list of person IDs (replaces current associations)'),
+      organization_ids: z.array(z.coerce.number().int()).optional().describe('Replacement list of organization IDs (replaces current associations)'),
     },
     async ({ opportunity_id, name, person_ids, organization_ids }) => {
       if (!name && !person_ids && !organization_ids) {

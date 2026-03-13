@@ -27,9 +27,9 @@ export function registerActivityTimelineTool(
     'get_activity_timeline',
     'Get a unified, chronologically sorted activity timeline for a person or organization — combines emails, meetings, and notes in a single view. Note: calls and chat messages are not included; use get_calls and get_chat_messages for those. Useful for pre-call prep or relationship reviews.',
     {
-      person_id: z.number().int().min(1).optional().describe('Person ID to fetch activity for'),
-      organization_id: z.number().int().min(1).optional().describe('Organization ID to fetch activity for'),
-      limit: z.number().int().min(1).max(100).default(20).describe('Max total items to return (default 20)'),
+      person_id: z.coerce.number().int().min(1).optional().describe('Person ID to fetch activity for'),
+      organization_id: z.coerce.number().int().min(1).optional().describe('Organization ID to fetch activity for'),
+      limit: z.coerce.number().int().min(1).max(100).default(20).describe('Max total items to return (default 20)'),
       since: z.string().optional().describe('ISO 8601 date — only return activity on or after this date'),
     },
     async ({ person_id, organization_id, limit, since }) => {

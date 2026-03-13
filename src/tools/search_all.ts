@@ -19,7 +19,7 @@ export function registerSearchAllTool(
     'Search across people, organizations, and opportunities simultaneously. Returns a unified result set — useful when you are unsure of the record type. Results are interleaved: person[0], org[0], opp[0], person[1], …',
     {
       query: z.string().describe('Name, email, domain, or keyword to search for'),
-      limit: z.number().int().min(1).max(50).default(10).describe('Max results per entity type (default 10)'),
+      limit: z.coerce.number().int().min(1).max(50).default(10).describe('Max results per entity type (default 10)'),
     },
     async ({ query, limit }) => {
       try {

@@ -93,7 +93,7 @@ describe('POST /webhook route', () => {
     return { AFFINITY_API_KEY: 'key', AFFINITY_CACHE: cache, AFFINITY_WEBHOOK_SECRET: secret };
   }
 
-  function makeWebhookRequest(secret: string | null, body: unknown = { id: 'evt-1', type: 'person.created', body: {}, created_at: '2024-01-01T00:00:00Z' }): Request {
+  function makeWebhookRequest(secret: string | null, body: unknown = { type: 'person.created', body: { id: 42 }, sent_at: 1631120151 }): Request {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (secret !== null) headers['X-Affinity-Webhook-Secret'] = secret;
     return new Request('https://affinity.trulock.com/webhook', {
@@ -160,10 +160,11 @@ describe('POST /webhook route', () => {
       {} as never,
     );
     expect(res.status).toBe(200);
-    const stored = await kv.get('webhook:event:evt-1');
+    const eventId = 'person.created:1631120151:42';
+    const stored = await kv.get(`webhook:event:${eventId}`);
     expect(stored).not.toBeNull();
     const recent = JSON.parse(await kv.get('webhook:recent') ?? '[]') as string[];
-    expect(recent).toContain('evt-1');
+    expect(recent).toContain(eventId);
   });
 
   it('deduplicates event IDs in the recency index', async () => {
@@ -172,8 +173,9 @@ describe('POST /webhook route', () => {
     // Send the same event twice
     await worker.fetch(makeWebhookRequest('secret'), env, {} as never);
     await worker.fetch(makeWebhookRequest('secret'), env, {} as never);
+    const eventId = 'person.created:1631120151:42';
     const recent = JSON.parse(await kv.get('webhook:recent') ?? '[]') as string[];
-    expect(recent.filter(id => id === 'evt-1')).toHaveLength(1);
+    expect(recent.filter(id => id === eventId)).toHaveLength(1);
   });
 });
 

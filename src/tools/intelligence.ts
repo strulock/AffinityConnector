@@ -31,7 +31,7 @@ export function registerIntelligenceTools(
     'get_relationship_strength',
     'Get the relationship strength score between you and a person or organization in Affinity. Returns a 0–100 score and last activity date.',
     {
-      entity_id: z.number().int().min(1).describe('Person or organization ID'),
+      entity_id: z.coerce.number().int().min(1).describe('Person or organization ID'),
       entity_type: z
         .number()
         .int()
@@ -59,7 +59,7 @@ export function registerIntelligenceTools(
     'find_intro_path',
     'Find people in your network who can introduce you to a target person, based on shared organizations and relationship strength.',
     {
-      person_id: z.number().int().min(1).describe('ID of the person you want an introduction to'),
+      person_id: z.coerce.number().int().min(1).describe('ID of the person you want an introduction to'),
     },
     async ({ person_id }) => {
       // 1. Get target person to find their organizations

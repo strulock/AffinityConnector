@@ -50,8 +50,8 @@ export function registerMergeTools(server: McpServer, api: MergesApi): void {
     'merge_persons',
     'DESTRUCTIVE — permanently merge two Affinity person records. The base person record is kept; the other is merged in and deleted. Requires "Manage duplicates" permission. This cannot be undone — confirm with the user before calling.',
     {
-      base_person_id: z.number().int().min(1).describe('ID of the person record to keep (the merge target)'),
-      to_merge_person_id: z.number().int().min(1).describe('ID of the person record to merge in (will be deleted)'),
+      base_person_id: z.coerce.number().int().min(1).describe('ID of the person record to keep (the merge target)'),
+      to_merge_person_id: z.coerce.number().int().min(1).describe('ID of the person record to merge in (will be deleted)'),
     },
     async ({ base_person_id, to_merge_person_id }) => {
       try {
@@ -71,8 +71,8 @@ export function registerMergeTools(server: McpServer, api: MergesApi): void {
     'merge_companies',
     'DESTRUCTIVE — permanently merge two Affinity company records. The base company record is kept; the other is merged in and deleted. Requires "Manage duplicates" permission. This cannot be undone — confirm with the user before calling.',
     {
-      base_company_id: z.number().int().min(1).describe('ID of the company record to keep (the merge target)'),
-      to_merge_company_id: z.number().int().min(1).describe('ID of the company record to merge in (will be deleted)'),
+      base_company_id: z.coerce.number().int().min(1).describe('ID of the company record to keep (the merge target)'),
+      to_merge_company_id: z.coerce.number().int().min(1).describe('ID of the company record to merge in (will be deleted)'),
     },
     async ({ base_company_id, to_merge_company_id }) => {
       try {

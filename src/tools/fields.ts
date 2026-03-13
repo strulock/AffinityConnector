@@ -107,7 +107,7 @@ export function registerFieldTools(server: McpServer, api: FieldsApi): void {
     'get_field_value_changes',
     'Get the audit history of changes to a specific Affinity field. Shows who changed the value, to what, and when. Useful for tracking pipeline stage transitions and other field mutations over time.',
     {
-      field_id: z.number().int().min(1).describe('Field ID (from get_field_definitions)'),
+      field_id: z.coerce.number().int().min(1).describe('Field ID (from get_field_definitions)'),
       entity_id: z
         .number()
         .int()
