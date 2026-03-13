@@ -31,11 +31,11 @@ function formatChatMessage(msg: AffinityChatMessageV2): string {
 }
 
 const COMMON_PARAMS = {
-  person_id: z.number().int().min(1).optional().describe('Filter by person ID'),
-  organization_id: z.number().int().min(1).optional().describe('Filter by organization ID'),
+  person_id: z.coerce.number().int().min(1).optional().describe('Filter by person ID'),
+  organization_id: z.coerce.number().int().min(1).optional().describe('Filter by organization ID'),
   created_after: z.string().optional().describe('ISO 8601 timestamp — only return items created after this date'),
   created_before: z.string().optional().describe('ISO 8601 timestamp — only return items created before this date'),
-  limit: z.number().int().min(1).max(100).default(25).describe('Max items to return'),
+  limit: z.coerce.number().int().min(1).max(100).default(25).describe('Max items to return'),
   page_token: z.string().optional().describe('Pagination token from a previous call'),
 };
 

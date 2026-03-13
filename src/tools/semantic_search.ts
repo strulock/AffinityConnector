@@ -17,7 +17,7 @@ export function registerSemanticSearchTools(server: McpServer, api: SemanticSear
     '(BETA) AI-powered natural language search over Affinity companies. Use this for fuzzy, conceptual, or partial-description queries (e.g. "Series B fintech companies in New York"). Currently supports companies only.',
     {
       query: z.string().describe('Natural language search query'),
-      limit: z.number().int().min(1).max(100).default(25).describe('Max results to return'),
+      limit: z.coerce.number().int().min(1).max(100).default(25).describe('Max results to return'),
       page_token: z.string().optional().describe('Pagination token from a previous call'),
     },
     async ({ query, limit, page_token }) => {

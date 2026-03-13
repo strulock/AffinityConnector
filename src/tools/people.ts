@@ -22,7 +22,7 @@ export function registerPeopleTools(server: McpServer, api: PeopleApi): void {
     'Search Affinity contacts by name or email. Returns up to 100 matching people, ordered by Affinity relevance.',
     {
       query: z.string().describe('Name or email to search for'),
-      limit: z.number().int().min(1).max(100).default(20).describe('Max results to return'),
+      limit: z.coerce.number().int().min(1).max(100).default(20).describe('Max results to return'),
     },
     async ({ query, limit }) => {
       const people = await api.search(query, limit);
@@ -45,7 +45,7 @@ export function registerPeopleTools(server: McpServer, api: PeopleApi): void {
     'get_person',
     'Get full details for an Affinity contact by their numeric ID.',
     {
-      person_id: z.number().int().min(1).describe('Affinity person ID'),
+      person_id: z.coerce.number().int().min(1).describe('Affinity person ID'),
     },
     async ({ person_id }) => {
       try {
@@ -81,7 +81,7 @@ export function registerPeopleTools(server: McpServer, api: PeopleApi): void {
       first_name: z.string().describe('First name'),
       last_name: z.string().describe('Last name'),
       emails: z.array(z.string().email()).optional().describe('Email addresses'),
-      organization_ids: z.array(z.number().int()).optional().describe('Organization IDs to associate'),
+      organization_ids: z.array(z.coerce.number().int()).optional().describe('Organization IDs to associate'),
       phone_numbers: z.array(z.string()).optional().describe('Phone numbers'),
     },
     async ({ first_name, last_name, emails, organization_ids, phone_numbers }) => {
@@ -99,7 +99,7 @@ export function registerPeopleTools(server: McpServer, api: PeopleApi): void {
     'delete_person',
     'DESTRUCTIVE — permanently delete an Affinity person record by ID. This cannot be undone. All associated list entries, notes, and field values will also be removed. Confirm with the user before calling.',
     {
-      person_id: z.number().int().min(1).describe('ID of the person to delete'),
+      person_id: z.coerce.number().int().min(1).describe('ID of the person to delete'),
     },
     async ({ person_id }) => {
       try {
@@ -115,11 +115,11 @@ export function registerPeopleTools(server: McpServer, api: PeopleApi): void {
     'update_person',
     'Update an existing Affinity contact by ID. Supply only the fields you want to change.',
     {
-      person_id: z.number().int().min(1).describe('Person ID to update'),
+      person_id: z.coerce.number().int().min(1).describe('Person ID to update'),
       first_name: z.string().optional().describe('New first name'),
       last_name: z.string().optional().describe('New last name'),
       emails: z.array(z.string().email()).optional().describe('Replacement email list (replaces current)'),
-      organization_ids: z.array(z.number().int()).optional().describe('Replacement organization ID list'),
+      organization_ids: z.array(z.coerce.number().int()).optional().describe('Replacement organization ID list'),
       phone_numbers: z.array(z.string()).optional().describe('Replacement phone number list'),
     },
     async ({ person_id, first_name, last_name, emails, organization_ids, phone_numbers }) => {

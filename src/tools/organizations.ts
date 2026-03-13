@@ -21,7 +21,7 @@ export function registerOrganizationTools(server: McpServer, api: OrganizationsA
     'Search Affinity organizations (companies) by name or domain. Returns up to 100 matching organizations, ordered by Affinity relevance.',
     {
       query: z.string().describe('Company name or domain to search for'),
-      limit: z.number().int().min(1).max(100).default(20).describe('Max results to return'),
+      limit: z.coerce.number().int().min(1).max(100).default(20).describe('Max results to return'),
     },
     async ({ query, limit }) => {
       const orgs = await api.search(query, limit);
@@ -46,7 +46,7 @@ export function registerOrganizationTools(server: McpServer, api: OrganizationsA
     'get_organization',
     'Get full details for an Affinity organization by its numeric ID.',
     {
-      org_id: z.number().int().min(1).describe('Affinity organization ID'),
+      org_id: z.coerce.number().int().min(1).describe('Affinity organization ID'),
     },
     async ({ org_id }) => {
       try {
@@ -78,7 +78,7 @@ export function registerOrganizationTools(server: McpServer, api: OrganizationsA
     {
       name: z.string().describe('Company name'),
       domain: z.string().optional().describe('Primary domain (e.g. acme.com)'),
-      person_ids: z.array(z.number().int()).optional().describe('Person IDs to associate with this org'),
+      person_ids: z.array(z.coerce.number().int()).optional().describe('Person IDs to associate with this org'),
     },
     async ({ name, domain, person_ids }) => {
       try {
@@ -94,7 +94,7 @@ export function registerOrganizationTools(server: McpServer, api: OrganizationsA
     'delete_organization',
     'DESTRUCTIVE — permanently delete an Affinity organization record by ID. This cannot be undone. All associated list entries, notes, and field values will also be removed. Confirm with the user before calling.',
     {
-      org_id: z.number().int().min(1).describe('ID of the organization to delete'),
+      org_id: z.coerce.number().int().min(1).describe('ID of the organization to delete'),
     },
     async ({ org_id }) => {
       try {
@@ -110,10 +110,10 @@ export function registerOrganizationTools(server: McpServer, api: OrganizationsA
     'update_organization',
     'Update an existing Affinity organization by ID. Supply only the fields you want to change.',
     {
-      org_id: z.number().int().min(1).describe('Organization ID to update'),
+      org_id: z.coerce.number().int().min(1).describe('Organization ID to update'),
       name: z.string().optional().describe('New company name'),
       domain: z.string().optional().describe('New primary domain'),
-      person_ids: z.array(z.number().int()).optional().describe('Replacement person ID list (replaces current)'),
+      person_ids: z.array(z.coerce.number().int()).optional().describe('Replacement person ID list (replaces current)'),
     },
     async ({ org_id, name, domain, person_ids }) => {
       if (!name && !domain && !person_ids) {

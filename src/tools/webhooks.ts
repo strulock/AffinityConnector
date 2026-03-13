@@ -65,7 +65,7 @@ export function registerWebhookTools(
     'update_webhook',
     'Update an Affinity webhook subscription. Change the target URL, event list, or enable/disable it.',
     {
-      webhook_id: z.number().int().min(1).describe('Webhook subscription ID (from list_webhooks)'),
+      webhook_id: z.coerce.number().int().min(1).describe('Webhook subscription ID (from list_webhooks)'),
       webhook_url: z.string().url().refine(u => u.startsWith('https://'), { message: 'webhook_url must be an https:// URL' }).optional().describe('New target URL'),
       subscriptions: z.array(z.string()).optional().describe('New event types list (replaces the existing list)'),
       disabled: z.boolean().optional().describe('Set to true to disable delivery, false to re-enable'),
@@ -92,7 +92,7 @@ export function registerWebhookTools(
     'delete_webhook',
     'Delete an Affinity webhook subscription by ID. Use list_webhooks to find webhook IDs.',
     {
-      webhook_id: z.number().int().min(1).describe('Webhook subscription ID to delete (from list_webhooks)'),
+      webhook_id: z.coerce.number().int().min(1).describe('Webhook subscription ID to delete (from list_webhooks)'),
     },
     async ({ webhook_id }) => {
       try {
@@ -109,8 +109,8 @@ export function registerWebhookTools(
     'Get recent Affinity webhook events received by this Worker. Stores the most recent 100 events — older events are not available. Optionally filter by event_type (e.g. "person.created") or entity_id. Use enrich=true to append the current entity name to each event (enrichment capped at 5 events). Returns events newest-first.',
     {
       event_type: z.string().optional().describe('Filter to a specific event type (e.g. "person.created")'),
-      entity_id: z.number().int().min(1).optional().describe('Filter to events involving a specific entity ID'),
-      limit: z.number().int().min(1).max(100).optional().describe('Maximum number of events to return (default 20)'),
+      entity_id: z.coerce.number().int().min(1).optional().describe('Filter to events involving a specific entity ID'),
+      limit: z.coerce.number().int().min(1).max(100).optional().describe('Maximum number of events to return (default 20)'),
       enrich: z.boolean().optional().describe('Fetch and append the current entity name for each event (max 5, default false)'),
     },
     async ({ event_type, entity_id, limit = 20, enrich = false }) => {

@@ -20,10 +20,10 @@ export function registerNotesTools(server: McpServer, api: NotesApi): void {
     'get_notes',
     'Get notes attached to a person or organization in Affinity.',
     {
-      person_id: z.number().int().min(1).optional().describe('Filter notes by person ID'),
-      organization_id: z.number().int().min(1).optional().describe('Filter notes by organization ID'),
-      opportunity_id: z.number().int().min(1).optional().describe('Filter notes by opportunity ID'),
-      limit: z.number().int().min(1).max(100).default(25).describe('Max notes to return'),
+      person_id: z.coerce.number().int().min(1).optional().describe('Filter notes by person ID'),
+      organization_id: z.coerce.number().int().min(1).optional().describe('Filter notes by organization ID'),
+      opportunity_id: z.coerce.number().int().min(1).optional().describe('Filter notes by opportunity ID'),
+      limit: z.coerce.number().int().min(1).max(100).default(25).describe('Max notes to return'),
       page_token: z.string().optional().describe('Pagination token from a previous call'),
     },
     async ({ person_id, organization_id, opportunity_id, limit, page_token }) => {
@@ -53,13 +53,13 @@ export function registerNotesTools(server: McpServer, api: NotesApi): void {
     'Create a new note on a person, organization, or opportunity in Affinity.',
     {
       content: z.string().min(1).describe('Note text content'),
-      person_ids: z.array(z.number().int()).optional().describe('Person IDs to attach the note to'),
+      person_ids: z.array(z.coerce.number().int()).optional().describe('Person IDs to attach the note to'),
       organization_ids: z
-        .array(z.number().int())
+        .array(z.coerce.number().int())
         .optional()
         .describe('Organization IDs to attach the note to'),
       opportunity_ids: z
-        .array(z.number().int())
+        .array(z.coerce.number().int())
         .optional()
         .describe('Opportunity IDs to attach the note to'),
     },
@@ -77,8 +77,8 @@ export function registerNotesTools(server: McpServer, api: NotesApi): void {
     'get_note_replies',
     'Fetch the reply thread for a specific Affinity note. Note: the v2 API excludes replies from the main notes list — use this tool to retrieve them separately.',
     {
-      note_id: z.number().int().min(1).describe('Note ID to fetch replies for (from get_notes results)'),
-      limit: z.number().int().min(1).max(100).default(25).describe('Max replies to return'),
+      note_id: z.coerce.number().int().min(1).describe('Note ID to fetch replies for (from get_notes results)'),
+      limit: z.coerce.number().int().min(1).max(100).default(25).describe('Max replies to return'),
       page_token: z.string().optional().describe('Pagination token from a previous call'),
     },
     async ({ note_id, limit, page_token }) => {
@@ -102,7 +102,7 @@ export function registerNotesTools(server: McpServer, api: NotesApi): void {
     'update_note',
     'Update the content of an existing Affinity note by its ID.',
     {
-      note_id: z.number().int().min(1).describe('Note ID to update (from get_notes results)'),
+      note_id: z.coerce.number().int().min(1).describe('Note ID to update (from get_notes results)'),
       content: z.string().min(1).describe('New note content (replaces existing content)'),
     },
     async ({ note_id, content }) => {
@@ -119,7 +119,7 @@ export function registerNotesTools(server: McpServer, api: NotesApi): void {
     'delete_note',
     'Delete an Affinity note by its ID. This is permanent and cannot be undone.',
     {
-      note_id: z.number().int().min(1).describe('Note ID to delete (from get_notes results)'),
+      note_id: z.coerce.number().int().min(1).describe('Note ID to delete (from get_notes results)'),
     },
     async ({ note_id }) => {
       try {

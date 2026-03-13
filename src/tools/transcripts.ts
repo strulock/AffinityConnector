@@ -39,7 +39,7 @@ export function registerTranscriptTools(server: McpServer, api: TranscriptsApi):
     '(BETA) List call and meeting transcripts from Affinity with AI summaries. Filter using Affinity filter syntax (e.g. "id=1" or "createdAt<2025-02-04T10:48:24Z").',
     {
       filter: z.string().optional().describe('Filter string (e.g. "id=1" or "createdAt<2025-02-04T10:48:24Z")'),
-      limit: z.number().int().min(1).max(100).default(20).describe('Number of transcripts per page'),
+      limit: z.coerce.number().int().min(1).max(100).default(20).describe('Number of transcripts per page'),
       cursor: z.string().optional().describe('Pagination cursor from a previous response'),
     },
     async ({ filter, limit, cursor }) => {
@@ -60,8 +60,8 @@ export function registerTranscriptTools(server: McpServer, api: TranscriptsApi):
     'get_transcript',
     '(BETA) Get the full content of an Affinity transcript with speaker dialogue. Use get_transcripts to find transcript IDs.',
     {
-      transcript_id: z.number().int().describe('Transcript ID (from get_transcripts)'),
-      limit: z.number().int().min(1).max(100).default(20).describe('Max fragments per page'),
+      transcript_id: z.coerce.number().int().describe('Transcript ID (from get_transcripts)'),
+      limit: z.coerce.number().int().min(1).max(100).default(20).describe('Max fragments per page'),
       cursor: z.string().optional().describe('Pagination cursor for long transcripts'),
     },
     async ({ transcript_id, limit, cursor }) => {
@@ -87,7 +87,7 @@ export function registerTranscriptTools(server: McpServer, api: TranscriptsApi):
     'get_transcript_info',
     '(BETA) Get transcript metadata, AI summary, and creator info. Use get_transcripts to find transcript IDs.',
     {
-      transcript_id: z.number().int().describe('Transcript ID'),
+      transcript_id: z.coerce.number().int().describe('Transcript ID'),
     },
     async ({ transcript_id }) => {
       try {
