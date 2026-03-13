@@ -6,3 +6,4 @@ dist/
 *.js.map
 .wrangler/
 coverage/
+.claude/settings.local.json

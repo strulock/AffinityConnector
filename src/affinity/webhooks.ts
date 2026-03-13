@@ -1,4 +1,4 @@
-// Affinity v1 webhook subscription endpoints: /webhook-subscriptions
+// Affinity v1 webhook endpoints: /webhook
 
 import { AffinityClient } from './client.js';
 import type { AffinityWebhookSubscription } from './types.js';
@@ -8,28 +8,32 @@ export class WebhooksApi {
 
   /** List all registered webhook subscriptions. */
   async listWebhooks(): Promise<AffinityWebhookSubscription[]> {
-    const result = await this.client.get<AffinityWebhookSubscription[]>('/webhook-subscriptions');
+    const result = await this.client.get<AffinityWebhookSubscription[]>('/webhook');
     return Array.isArray(result) ? result : [];
   }
 
   /** Register a new webhook subscription. */
-  async createWebhook(params: {
-    webhook_url: string;
-    subscriptions: string[];
-  }): Promise<AffinityWebhookSubscription> {
-    return this.client.post<AffinityWebhookSubscription>('/webhook-subscriptions', params);
+  async createWebhook(webhookUrl: string): Promise<AffinityWebhookSubscription> {
+    return this.client.post<AffinityWebhookSubscription>(
+      `/webhook/subscribe?webhook_url=${encodeURIComponent(webhookUrl)}`,
+      undefined,
+    );
   }
 
-  /** Update an existing webhook subscription (URL, event list, or active state). */
+  /** Update an existing webhook subscription (URL, event list, or disabled flag). */
   async updateWebhook(
     id: number,
-    params: { webhook_url?: string; subscriptions?: string[]; state?: 'active' | 'inactive' },
+    params: { webhook_url?: string; subscriptions?: string[]; disabled?: boolean },
   ): Promise<AffinityWebhookSubscription> {
-    return this.client.put<AffinityWebhookSubscription>(`/webhook-subscriptions/${id}`, params);
+    const qs = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined) qs.set(key, String(value));
+    }
+    return this.client.put<AffinityWebhookSubscription>(`/webhook/${id}?${qs}`, undefined);
   }
 
   /** Delete a webhook subscription by ID. */
   async deleteWebhook(id: number): Promise<void> {
-    await this.client.del<{ success: boolean }>(`/webhook-subscriptions/${id}`);
+    await this.client.del<{ success: boolean }>(`/webhook/${id}`);
   }
 }

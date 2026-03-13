@@ -13,7 +13,7 @@ const WEBHOOK_RECENT_KEY = 'webhook:recent';
 const DEFAULT_WEBHOOK_URL = 'https://affinity.trulock.com/webhook';
 
 function formatWebhook(w: AffinityWebhookSubscription): string {
-  return `[webhook:${w.id}] ${w.state} — ${w.webhook_url}\n  Events: ${w.subscriptions.join(', ')}`;
+  return `[webhook:${w.id}] ${w.disabled ? 'disabled' : 'active'} — ${w.webhook_url}\n  Events: ${w.subscriptions.join(', ')}`;
 }
 
 export function registerWebhookTools(
@@ -43,19 +43,18 @@ export function registerWebhookTools(
 
   server.tool(
     'create_webhook',
-    'Register a new Affinity webhook subscription. Available event types: person.created, person.updated, organization.created, organization.updated, note.created, field_value.created, field_value.updated, field_value.deleted, list_entry.created, list_entry.deleted. The target URL defaults to https://affinity.trulock.com/webhook.',
+    `Register a new Affinity webhook subscription. The target URL defaults to ${DEFAULT_WEBHOOK_URL}.`,
     {
-      subscriptions: z.array(z.string()).min(1).describe('Event types to subscribe to (e.g. ["person.created", "note.created"])'),
       webhook_url: z.string().url().refine(u => u.startsWith('https://'), { message: 'webhook_url must be an https:// URL' }).optional().describe(`Target URL to receive events (defaults to ${DEFAULT_WEBHOOK_URL})`),
     },
-    async ({ subscriptions, webhook_url }) => {
+    async ({ webhook_url }) => {
       try {
         const url = webhook_url ?? DEFAULT_WEBHOOK_URL;
-        const webhook = await api.createWebhook({ webhook_url: url, subscriptions });
+        const webhook = await api.createWebhook(url);
         return {
           content: [{
             type: 'text',
-            text: `Created webhook [id:${webhook.id}] (${webhook.state}) → ${webhook.webhook_url}\nEvents: ${webhook.subscriptions.join(', ')}`,
+            text: `Created webhook [id:${webhook.id}] (${webhook.disabled ? 'disabled' : 'active'}) → ${webhook.webhook_url}`,
           }],
         };
       } catch (e) { return toolError(e); }
@@ -64,25 +63,25 @@ export function registerWebhookTools(
 
   server.tool(
     'update_webhook',
-    'Update an Affinity webhook subscription. Change the target URL, event list, or toggle active/inactive.',
+    'Update an Affinity webhook subscription. Change the target URL, event list, or enable/disable it.',
     {
       webhook_id: z.number().int().min(1).describe('Webhook subscription ID (from list_webhooks)'),
       webhook_url: z.string().url().refine(u => u.startsWith('https://'), { message: 'webhook_url must be an https:// URL' }).optional().describe('New target URL'),
       subscriptions: z.array(z.string()).optional().describe('New event types list (replaces the existing list)'),
-      state: z.enum(['active', 'inactive']).optional().describe('Set to "inactive" to pause delivery'),
+      disabled: z.boolean().optional().describe('Set to true to disable delivery, false to re-enable'),
     },
-    async ({ webhook_id, webhook_url, subscriptions, state }) => {
-      if (webhook_url === undefined && subscriptions === undefined && state === undefined) {
+    async ({ webhook_id, webhook_url, subscriptions, disabled }) => {
+      if (webhook_url === undefined && subscriptions === undefined && disabled === undefined) {
         return {
           content: [{ type: 'text', text: 'Provide at least one field to update.' }],
         };
       }
       try {
-        const webhook = await api.updateWebhook(webhook_id, { webhook_url, subscriptions, state });
+        const webhook = await api.updateWebhook(webhook_id, { webhook_url, subscriptions, disabled });
         return {
           content: [{
             type: 'text',
-            text: `Updated webhook [id:${webhook.id}] (${webhook.state}) → ${webhook.webhook_url}`,
+            text: `Updated webhook [id:${webhook.id}] (${webhook.disabled ? 'disabled' : 'active'}) → ${webhook.webhook_url}`,
           }],
         };
       } catch (e) { return toolError(e); }
