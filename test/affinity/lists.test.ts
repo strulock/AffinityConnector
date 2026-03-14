@@ -303,10 +303,20 @@ describe('ListsApi.getSavedViews', () => {
   });
 });
 
+// v2 shape returned by the API for getSavedViewEntries
+const MOCK_V2_ENTRY = {
+  id: 500,
+  type: 'company',
+  listId: 1,
+  createdAt: '2024-01-01T00:00:00Z',
+  creatorId: 99,
+  entity: { id: 10, name: 'Acme', domain: 'acme.com', domains: ['acme.com'], person_ids: [], opportunity_ids: [], list_entries: [], interaction_dates: { first_email_date: null, last_email_date: null, first_event_date: null, last_event_date: null, last_interaction_date: null, next_event_date: null }, created_at: '2023-01-01T00:00:00Z' },
+};
+
 describe('ListsApi.getSavedViewEntries', () => {
   it('returns entries from the v2 API', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify({ list_entries: [MOCK_ENTRY_RESULT], next_page_token: null }), { status: 200 }))
+      Promise.resolve(new Response(JSON.stringify({ data: [MOCK_V2_ENTRY], pagination: { nextUrl: null } }), { status: 200 }))
     );
     vi.stubGlobal('fetch', fetchMock);
     const api = new ListsApi(new AffinityClient('key'));
@@ -320,7 +330,10 @@ describe('ListsApi.getSavedViewEntries', () => {
 
   it('returns nextPageToken when present', async () => {
     vi.stubGlobal('fetch', vi.fn().mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify({ list_entries: [], next_page_token: 'tok-xyz' }), { status: 200 }))
+      Promise.resolve(new Response(JSON.stringify({
+        data: [],
+        pagination: { nextUrl: 'https://api.affinity.co/v2/lists/1/saved-views/10/list-entries?cursor=tok-xyz' },
+      }), { status: 200 }))
     ));
     const api = new ListsApi(new AffinityClient('key'));
     const result = await api.getSavedViewEntries(1, 10, 25);
@@ -338,13 +351,13 @@ describe('ListsApi.getSavedViewEntries', () => {
 
   it('includes page_token in URL when provided', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify({ list_entries: [] }), { status: 200 }))
+      Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
     );
     vi.stubGlobal('fetch', fetchMock);
     const api = new ListsApi(new AffinityClient('key'));
     await api.getSavedViewEntries(1, 10, 25, 'tok-sv');
     const [url] = fetchMock.mock.calls[0] as [string];
-    expect(url).toContain('page_token=tok-sv');
+    expect(url).toContain('cursor=tok-sv');
   });
 });
 

@@ -49,7 +49,7 @@ describe('SemanticSearchApi.search', () => {
     await api.search('fintech', { page_token: 'tok-ss' });
     const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     const body = JSON.parse((init as RequestInit).body as string);
-    expect(body.page_token).toBe('tok-ss');
+    expect(body.cursor).toBe('tok-ss');
   });
 
   it('POSTs to /v2/semantic-search with entityType and prompt', async () => {

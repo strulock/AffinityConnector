@@ -155,17 +155,43 @@ export class ListsApi {
     limit = 25,
     pageToken?: string,
   ): Promise<{ entries: AffinityListEntry[]; nextPageToken?: string }> {
-    const params: Record<string, unknown> = { page_size: limit };
-    if (pageToken) params.page_token = pageToken;
+    // v2 uses `limit` and `cursor` (not `page_size` / `page_token`)
+    const params: Record<string, unknown> = { limit };
+    if (pageToken) params.cursor = pageToken;
 
+    // v2 response shape: { data: [...], pagination: { prevUrl, nextUrl } }
+    // entity type is a string ('person' | 'company' | 'opportunity'), not a numeric code
     const result = await this.client.get<{
-      list_entries: AffinityListEntry[];
-      next_page_token?: string | null;
+      data: Array<{
+        id: number;
+        type: string;
+        listId: number;
+        createdAt: string;
+        creatorId: number | null;
+        entity: Record<string, unknown>;
+      }>;
+      pagination?: { prevUrl?: string | null; nextUrl?: string | null };
     }>(`/lists/${listId}/saved-views/${viewId}/list-entries`, params, 'v2');
 
-    return {
-      entries: result.list_entries ?? [],
-      nextPageToken: result.next_page_token ?? undefined,
-    };
+    const TYPE_MAP: Record<string, number> = { person: 0, company: 1, opportunity: 8 };
+    const entries = (result.data ?? []).map(e => ({
+      id: e.id,
+      list_id: e.listId ?? listId,
+      entity_id: (e.entity?.id as number) ?? 0,
+      entity_type: TYPE_MAP[e.type] ?? -1,
+      entity: e.entity as unknown as AffinityListEntry['entity'],
+      creator_id: e.creatorId ?? null,
+      created_at: e.createdAt ?? '',
+    })) as AffinityListEntry[];
+
+    // Cursor for next page is in the `cursor` query param of pagination.nextUrl
+    let nextPageToken: string | undefined;
+    if (result.pagination?.nextUrl) {
+      try {
+        nextPageToken = new URL(result.pagination.nextUrl).searchParams.get('cursor') ?? undefined;
+      } catch { /* ignore malformed URL */ }
+    }
+
+    return { entries, nextPageToken };
   }
 }
