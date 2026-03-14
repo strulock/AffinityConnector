@@ -66,7 +66,7 @@ export function registerPeopleTools(server: McpServer, api: PeopleApi): void {
         `Last email: ${dates?.last_email_date ?? 'N/A'}`,
         `Last interaction: ${dates?.last_interaction_date ?? 'N/A'}`,
         `Next event: ${dates?.next_event_date ?? 'N/A'}`,
-        `Created: ${person.created_at}`,
+        `Created: ${person.created_at ?? 'N/A'}`,
       ].join('\n');
 
       return { content: [{ type: 'text', text }] };

@@ -16,11 +16,11 @@ export class SemanticSearchApi {
     params: { limit?: number; page_token?: string } = {},
   ): Promise<{ results: AffinitySemanticResult[]; nextPageToken?: string }> {
     const { limit = 25, page_token } = params;
-    const body: Record<string, unknown> = { query, entity_types: ['company'], page_size: limit };
+    const body: Record<string, unknown> = { prompt: query, entityType: 'companies', page_size: limit };
     if (page_token) body.page_token = page_token;
 
-    const result = await this.client.post<AffinityPaginatedResponse<AffinitySemanticResult>>(
-      '/search',
+    const result = await this.client.post<{ data: AffinitySemanticResult[]; next_page_token?: string | null }>(
+      '/semantic-search',
       body,
       'v2',
     );

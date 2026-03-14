@@ -16,6 +16,8 @@ const MOCK_ORG: AffinityOrganization = { id: 10, name: 'Acme', domain: 'acme.com
 const PERSON_3: AffinityPerson = { ...MOCK_PERSON, id: 3, first_name: 'Carol', last_name: 'White', emails: ['carol@example.com'], primary_email: 'carol@example.com' };
 const PERSON_2: AffinityPerson = { ...MOCK_PERSON, id: 2, first_name: 'Bob', last_name: 'Jones', emails: ['bob@example.com'], primary_email: 'bob@example.com' };
 const MOCK_STRENGTH: AffinityRelationshipStrength = { entity_id: 1, entity_type: 0, strength: 75, last_activity_date: '2024-01-20' };
+// v1 /relationships-strengths returns an array of { internal_id, external_id, strength } where strength is 0–1 float
+const MOCK_STRENGTH_V1 = [{ internal_id: 99, external_id: 1, strength: 0.75 }];
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -39,7 +41,7 @@ function setupTools(fetchSequence: unknown[]) {
 
 describe('get_relationship_strength tool', () => {
   it('returns strength score and label for a person', async () => {
-    const { callTool } = setupTools([MOCK_STRENGTH]);
+    const { callTool } = setupTools([MOCK_STRENGTH_V1]);
     const result = await callTool('get_relationship_strength', { entity_id: 1, entity_type: 0 });
     const text = result.content[0].text;
     expect(text).toContain('75/100');
@@ -48,8 +50,7 @@ describe('get_relationship_strength tool', () => {
   });
 
   it('returns strength score for an organization', async () => {
-    const orgStrength = { ...MOCK_STRENGTH, entity_type: 1, strength: 85 };
-    const { callTool } = setupTools([orgStrength]);
+    const { callTool } = setupTools([[{ internal_id: 99, external_id: 10, strength: 0.85 }]]);
     const result = await callTool('get_relationship_strength', { entity_id: 10, entity_type: 1 });
     const text = result.content[0].text;
     expect(text).toContain('organization 10');
@@ -57,14 +58,15 @@ describe('get_relationship_strength tool', () => {
   });
 
   it('shows "unknown" when last_activity_date is null', async () => {
-    const { callTool } = setupTools([{ ...MOCK_STRENGTH, last_activity_date: null }]);
+    // v1 response never includes last_activity_date — the connector always returns null
+    const { callTool } = setupTools([MOCK_STRENGTH_V1]);
     const result = await callTool('get_relationship_strength', { entity_id: 1, entity_type: 0 });
     expect(result.content[0].text).toContain('unknown');
   });
 
   it('labels strength correctly across all bands', async () => {
-    for (const [strength, label] of [[85, 'Very Strong'], [65, 'Strong'], [45, 'Moderate'], [25, 'Weak'], [10, 'Very Weak']] as const) {
-      const { callTool } = setupTools([{ ...MOCK_STRENGTH, strength }]);
+    for (const [strength, label] of [[0.85, 'Very Strong'], [0.65, 'Strong'], [0.45, 'Moderate'], [0.25, 'Weak'], [0.10, 'Very Weak']] as const) {
+      const { callTool } = setupTools([[{ internal_id: 99, external_id: 1, strength }]]);
       const result = await callTool('get_relationship_strength', { entity_id: 1, entity_type: 0 });
       expect(result.content[0].text).toContain(label);
     }
@@ -74,8 +76,8 @@ describe('get_relationship_strength tool', () => {
 describe('find_intro_path tool', () => {
   it('returns ranked introducers from shared organizations', async () => {
     // Sequence: getById(person), getById(org), strengths for persons 2 & 3, name lookups
-    const strength2 = { ...MOCK_STRENGTH, entity_id: 2, strength: 75 };
-    const strength3 = { ...MOCK_STRENGTH, entity_id: 3, strength: 40 };
+    const strength2 = [{ internal_id: 99, external_id: 2, strength: 0.75 }];
+    const strength3 = [{ internal_id: 99, external_id: 3, strength: 0.40 }];
     const { callTool } = setupTools([
       MOCK_PERSON,   // target person lookup
       MOCK_ORG,      // org lookup (has person_ids [1,2,3])
@@ -130,7 +132,7 @@ describe('find_intro_path tool', () => {
       call++;
       if (call === 1) return Promise.resolve(new Response(JSON.stringify(MOCK_PERSON), { status: 200 }));
       if (call === 2) return Promise.resolve(new Response(JSON.stringify(MOCK_ORG), { status: 200 }));
-      if (call === 3) return Promise.resolve(new Response(JSON.stringify(MOCK_STRENGTH), { status: 200 }));
+      if (call === 3) return Promise.resolve(new Response(JSON.stringify(MOCK_STRENGTH_V1), { status: 200 }));
       return Promise.resolve(new Response('{}', { status: 404 })); // person lookup fails
     }));
     const client = new AffinityClient('key');
@@ -161,8 +163,8 @@ describe('find_intro_path tool', () => {
       if (call === 1) return Promise.resolve(new Response(JSON.stringify(personTwoOrgs), { status: 200 }));
       if (call === 2) return Promise.resolve(new Response(JSON.stringify(MOCK_ORG), { status: 200 })); // org 10 ok
       if (call === 3) return Promise.resolve(new Response('{}', { status: 404 }));                     // org 11 fails
-      if (call === 4) return Promise.resolve(new Response(JSON.stringify({ ...MOCK_STRENGTH, entity_id: 2, strength: 70 }), { status: 200 }));
-      if (call === 5) return Promise.resolve(new Response(JSON.stringify({ ...MOCK_STRENGTH, entity_id: 3, strength: 50 }), { status: 200 }));
+      if (call === 4) return Promise.resolve(new Response(JSON.stringify([{ internal_id: 99, external_id: 2, strength: 0.70 }]), { status: 200 }));
+      if (call === 5) return Promise.resolve(new Response(JSON.stringify([{ internal_id: 99, external_id: 3, strength: 0.50 }]), { status: 200 }));
       return Promise.resolve(new Response(JSON.stringify(call === 6 ? PERSON_2 : PERSON_3), { status: 200 }));
     }));
     const client = new AffinityClient('key');
@@ -179,7 +181,7 @@ describe('find_intro_path tool', () => {
     const { callTool } = setupTools([
       MOCK_PERSON,
       orgOneConnector,
-      { ...MOCK_STRENGTH, entity_id: 2, strength: 60 },
+      [{ internal_id: 99, external_id: 2, strength: 0.60 }],
       PERSON_2,
     ]);
     const result = await callTool('find_intro_path', { person_id: 1 });
@@ -199,7 +201,7 @@ describe('summarize_relationship tool', () => {
   it('aggregates person profile, strength, notes, and interactions', async () => {
     const { callTool } = setupTools([
       MOCK_PERSON,              // getById (profile)
-      MOCK_STRENGTH,            // getRelationshipStrength
+      MOCK_STRENGTH_V1,         // getRelationshipStrength
       [],                       // getNotes
       { data: [] },             // getEmails (v2)
       { data: [] },             // getMeetings (v2)
@@ -213,10 +215,9 @@ describe('summarize_relationship tool', () => {
   });
 
   it('aggregates org profile, strength, notes, and interactions', async () => {
-    const orgStrength = { ...MOCK_STRENGTH, entity_type: 1, entity_id: 10 };
     const { callTool } = setupTools([
-      MOCK_ORG,         // getById (profile)
-      orgStrength,      // getRelationshipStrength
+      MOCK_ORG,              // getById (profile)
+      MOCK_STRENGTH_V1,      // getRelationshipStrength
       [],               // getNotes
       { data: [] },     // getEmails (v2)
       { data: [] },     // getMeetings (v2)
@@ -229,7 +230,7 @@ describe('summarize_relationship tool', () => {
 
   it('includes org notes when present', async () => {
     const note = { id: 1, person_ids: [], organization_ids: [10], opportunity_ids: [], creator_id: 99, content: 'Key account', type: 0, is_deleted: false, created_at: '2024-01-15T00:00:00Z' };
-    const orgStrength = { ...MOCK_STRENGTH, entity_type: 1 };
+    const orgStrength = MOCK_STRENGTH_V1;
     const { callTool } = setupTools([MOCK_ORG, orgStrength, [note], { data: [] }, { data: [] }]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
     expect(result.content[0].text).toContain('Key account');
@@ -237,7 +238,7 @@ describe('summarize_relationship tool', () => {
 
   it('includes org interactions when present (meeting type)', async () => {
     const meeting = { id: 'm1', title: null, start_time: '2024-01-10T00:00:00Z', end_time: null, created_at: '2024-01-10T00:00:00Z', person_ids: [], organization_ids: [10] };
-    const orgStrength = { ...MOCK_STRENGTH, entity_type: 1 };
+    const orgStrength = MOCK_STRENGTH_V1;
     const { callTool } = setupTools([MOCK_ORG, orgStrength, [], { data: [] }, { data: [meeting] }]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
     const text = result.content[0].text;
@@ -282,21 +283,21 @@ describe('summarize_relationship tool', () => {
 
   it('includes note content when notes are present', async () => {
     const note = { id: 1, person_ids: [1], organization_ids: [], opportunity_ids: [], creator_id: 99, content: 'Very promising lead', type: 0, is_deleted: false, created_at: '2024-01-15T00:00:00Z' };
-    const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH, [note], { data: [] }, { data: [] }]);
+    const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH_V1, [note], { data: [] }, { data: [] }]);
     const result = await callTool('summarize_relationship', { person_id: 1 });
     expect(result.content[0].text).toContain('Very promising lead');
   });
 
   it('includes interaction details when interactions are present', async () => {
     const email = { id: 'e1', subject: 'Intro call', sent_at: '2024-01-10T00:00:00Z', created_at: '2024-01-10T00:00:00Z', person_ids: [1], organization_ids: [] };
-    const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH, [], { data: [email] }, { data: [] }]);
+    const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH_V1, [], { data: [email] }, { data: [] }]);
     const result = await callTool('summarize_relationship', { person_id: 1 });
     expect(result.content[0].text).toContain('Intro call');
   });
 
   it('includes meeting with title in person interactions', async () => {
     const meeting = { id: 'm1', title: 'Strategy call', start_time: '2024-01-11T00:00:00Z', end_time: null, created_at: '2024-01-11T00:00:00Z', person_ids: [1], organization_ids: [] };
-    const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH, [], { data: [] }, { data: [meeting] }]);
+    const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH_V1, [], { data: [] }, { data: [meeting] }]);
     const result = await callTool('summarize_relationship', { person_id: 1 });
     expect(result.content[0].text).toContain('Strategy call');
   });
@@ -304,7 +305,7 @@ describe('summarize_relationship tool', () => {
   it('shows fallback labels when person email subject and meeting title are null', async () => {
     const email = { id: 'e3', subject: null, sent_at: '2024-01-08T00:00:00Z', created_at: '2024-01-08T00:00:00Z', person_ids: [1], organization_ids: [] };
     const meeting = { id: 'm2', title: null, start_time: '2024-01-09T00:00:00Z', end_time: null, created_at: '2024-01-09T00:00:00Z', person_ids: [1], organization_ids: [] };
-    const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH, [], { data: [email] }, { data: [meeting] }]);
+    const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH_V1, [], { data: [email] }, { data: [meeting] }]);
     const result = await callTool('summarize_relationship', { person_id: 1 });
     const text = result.content[0].text;
     expect(text).toContain('(no subject)');
@@ -312,7 +313,7 @@ describe('summarize_relationship tool', () => {
   });
 
   it('includes email in org interactions when present', async () => {
-    const orgStrength = { ...MOCK_STRENGTH, entity_type: 1 };
+    const orgStrength = MOCK_STRENGTH_V1;
     const email = { id: 'e2', subject: null, sent_at: '2024-01-09T00:00:00Z', created_at: '2024-01-09T00:00:00Z', person_ids: [], organization_ids: [10] };
     const { callTool } = setupTools([MOCK_ORG, orgStrength, [], { data: [email] }, { data: [] }]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
@@ -321,22 +322,22 @@ describe('summarize_relationship tool', () => {
 
   it('falls back to emails[0] when person primary_email is null', async () => {
     const personNoEmail = { ...MOCK_PERSON, primary_email: null, emails: ['secondary@example.com'] };
-    const { callTool } = setupTools([personNoEmail, MOCK_STRENGTH, [], { data: [] }, { data: [] }]);
+    const { callTool } = setupTools([personNoEmail, MOCK_STRENGTH_V1, [], { data: [] }, { data: [] }]);
     const result = await callTool('summarize_relationship', { person_id: 1 });
     expect(result.content[0].text).toContain('secondary@example.com');
   });
 
   it('falls back to domains[0] when org domain is null', async () => {
     const orgNoDomain = { ...MOCK_ORG, domain: null, domains: ['fallback.com'] };
-    const orgStrength = { ...MOCK_STRENGTH, entity_type: 1 };
+    const orgStrength = MOCK_STRENGTH_V1;
     const { callTool } = setupTools([orgNoDomain, orgStrength, [], { data: [] }, { data: [] }]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
     expect(result.content[0].text).toContain('fallback.com');
   });
 
   it('shows "unknown" last activity for person when strength date is null', async () => {
-    const strengthNoDate = { ...MOCK_STRENGTH, last_activity_date: null };
-    const { callTool } = setupTools([MOCK_PERSON, strengthNoDate, [], { data: [] }, { data: [] }]);
+    // v1 /relationships-strengths never returns last_activity_date, so it's always null → "unknown"
+    const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH_V1, [], { data: [] }, { data: [] }]);
     const result = await callTool('summarize_relationship', { person_id: 1 });
     expect(result.content[0].text).toContain('unknown');
   });
@@ -370,8 +371,8 @@ describe('summarize_relationship tool', () => {
   });
 
   it('shows "unknown" last activity for org when strength date is null', async () => {
-    const orgStrengthNoDate = { ...MOCK_STRENGTH, entity_type: 1, last_activity_date: null };
-    const { callTool } = setupTools([MOCK_ORG, orgStrengthNoDate, [], { data: [] }, { data: [] }]);
+    // v1 /relationships-strengths never returns last_activity_date, so it's always null → "unknown"
+    const { callTool } = setupTools([MOCK_ORG, MOCK_STRENGTH_V1, [], { data: [] }, { data: [] }]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
     expect(result.content[0].text).toContain('unknown');
   });

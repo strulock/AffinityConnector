@@ -52,7 +52,7 @@ describe('SemanticSearchApi.search', () => {
     expect(body.page_token).toBe('tok-ss');
   });
 
-  it('POSTs to /v2/search with entity_types and query', async () => {
+  it('POSTs to /v2/semantic-search with entityType and prompt', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
       Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
     );
@@ -61,10 +61,10 @@ describe('SemanticSearchApi.search', () => {
     await api.search('Series B startup');
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toContain('/v2/');
-    expect(url).toContain('/search');
+    expect(url).toContain('/semantic-search');
     expect((init as RequestInit).method).toBe('POST');
     const body = JSON.parse((init as RequestInit).body as string);
-    expect(body.query).toBe('Series B startup');
-    expect(body.entity_types).toContain('company');
+    expect(body.prompt).toBe('Series B startup');
+    expect(body.entityType).toBe('companies');
   });
 });
