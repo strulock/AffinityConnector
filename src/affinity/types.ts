@@ -102,7 +102,7 @@ export interface AffinityField {
   id: number;
   name: string;
   list_id: number | null;
-  value_type: number; // 0 = text, 1 = number, 2 = date, 3 = location, 4 = person, 5 = organization, 6 = dropdown
+  value_type: number; // 0 = person, 1 = organization, 2 = dropdown, 3 = number, 4 = date, 5 = location, 6 = text (long), 7 = ranked dropdown
   allows_multiple: boolean;
   is_required: boolean;
   is_read_only: boolean;
@@ -197,10 +197,9 @@ export interface AffinityReminder {
 
 export interface AffinitySavedView {
   id: number;
-  list_id: number;
   name: string;
-  creator_id: number;
-  is_public: boolean;
+  type: string;
+  createdAt: string;
 }
 
 export interface AffinityFieldValueChange {

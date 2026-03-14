@@ -4,11 +4,14 @@ import { IntelligenceApi } from '../../src/affinity/intelligence.js';
 import { makeKVMock } from '../helpers/kv-mock.js';
 import type { AffinityRelationshipStrength } from '../../src/affinity/types.js';
 
-const MOCK_STRENGTH: AffinityRelationshipStrength = {
+// v1 /relationships-strengths returns an array of { internal_id, external_id, strength }
+// where strength is a 0–1 float. The API maps this to 0–100 int with last_activity_date: null.
+const MOCK_V1_STRENGTH = [{ internal_id: 99, external_id: 1, strength: 0.75 }];
+const EXPECTED_STRENGTH: AffinityRelationshipStrength = {
   entity_id: 1,
   entity_type: 0,
   strength: 75,
-  last_activity_date: '2024-01-20',
+  last_activity_date: null,
 };
 
 afterEach(() => {
@@ -18,30 +21,30 @@ afterEach(() => {
 describe('IntelligenceApi.getRelationshipStrength', () => {
   it('returns relationship strength from the API', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(MOCK_STRENGTH), { status: 200 })
+      new Response(JSON.stringify(MOCK_V1_STRENGTH), { status: 200 })
     ));
     const client = new AffinityClient('key');
     const api = new IntelligenceApi(client);
     const result = await api.getRelationshipStrength(1, 0);
-    expect(result).toEqual(MOCK_STRENGTH);
+    expect(result).toEqual(EXPECTED_STRENGTH);
   });
 
-  it('requests with correct entity_id and entity_type params on the v2 base URL', async () => {
+  it('requests with correct entity_id and entity_type params on the v1 base URL', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(MOCK_STRENGTH), { status: 200 })
+      new Response(JSON.stringify(MOCK_V1_STRENGTH), { status: 200 })
     ));
     const client = new AffinityClient('key');
     const api = new IntelligenceApi(client);
     await api.getRelationshipStrength(42, 1);
     const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
-    expect(url).toContain('/v2/');
+    expect(url).not.toContain('/v2/');
     expect(url).toContain('entity_id=42');
     expect(url).toContain('entity_type=1');
   });
 
   it('serves the result from cache on the second call', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(MOCK_STRENGTH), { status: 200 })
+      new Response(JSON.stringify(MOCK_V1_STRENGTH), { status: 200 })
     );
     vi.stubGlobal('fetch', fetchMock);
     const client = new AffinityClient('key', { cache: makeKVMock() });
@@ -52,10 +55,10 @@ describe('IntelligenceApi.getRelationshipStrength', () => {
   });
 
   it('makes separate cache entries for different entities', async () => {
-    const strength2: AffinityRelationshipStrength = { ...MOCK_STRENGTH, entity_id: 2, strength: 30 };
+    const v1Strength2 = [{ internal_id: 99, external_id: 2, strength: 0.30 }];
     const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(MOCK_STRENGTH), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(strength2), { status: 200 }));
+      .mockResolvedValueOnce(new Response(JSON.stringify(MOCK_V1_STRENGTH), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify(v1Strength2), { status: 200 }));
     vi.stubGlobal('fetch', fetchMock);
     const client = new AffinityClient('key', { cache: makeKVMock() });
     const api = new IntelligenceApi(client);

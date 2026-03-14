@@ -5,6 +5,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { InteractionsV2Api } from '../affinity/interactions_v2.js';
 import { NotesApi } from '../affinity/notes.js';
 import { toolError } from './_error.js';
+import { AffinityNotFoundError } from '../affinity/client.js';
 
 interface TimelineItem {
   date: string;
@@ -41,8 +42,12 @@ export function registerActivityTimelineTool(
       const scope = { person_id, organization_id, limit };
 
       const [{ emails }, { meetings }, { notes }] = await Promise.all([
-        interactionsV2Api.getEmails(scope),
-        interactionsV2Api.getMeetings(scope),
+        interactionsV2Api.getEmails(scope).catch((e: unknown) =>
+          e instanceof AffinityNotFoundError ? { emails: [] as const } : Promise.reject(e)
+        ),
+        interactionsV2Api.getMeetings(scope).catch((e: unknown) =>
+          e instanceof AffinityNotFoundError ? { meetings: [] as const } : Promise.reject(e)
+        ),
         notesApi.getNotes(scope),
       ]);
 

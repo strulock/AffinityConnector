@@ -11,7 +11,7 @@ const MOCK_FIELD: AffinityField = {
   id: 5,
   name: 'Stage',
   list_id: 1,
-  value_type: 6,
+  value_type: 2, // 2 = Dropdown (correct mapping)
   allows_multiple: false,
   is_required: true,
   is_read_only: false,
@@ -166,8 +166,8 @@ describe('get_field_definitions tool', () => {
 
   it('labels all known value_type codes correctly', async () => {
     const typeTests: [number, string][] = [
-      [0, 'Text'], [1, 'Number'], [2, 'Date'], [3, 'Location'],
-      [4, 'Person'], [5, 'Organization'], [6, 'Dropdown'],
+      [0, 'Person'], [1, 'Organization'], [2, 'Dropdown'], [3, 'Number'],
+      [4, 'Date'], [5, 'Location'], [6, 'Text'], [7, 'Ranked Dropdown'],
     ];
     for (const [value_type, label] of typeTests) {
       const { callTool } = setup([{ ...MOCK_FIELD, value_type }]);

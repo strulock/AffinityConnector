@@ -250,7 +250,7 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
           return { content: [{ type: 'text', text: `No saved views found for list ${list_id}.` }] };
         }
         const lines = views.map(
-          v => `[view:${v.id}] ${v.name} — by user ${v.creator_id}${v.is_public ? ', public' : ', private'}`
+          v => `[view:${v.id}] ${v.name} (${v.type})`
         );
         return {
           content: [{ type: 'text', text: `${views.length} saved view(s) for list ${list_id}:\n\n${lines.join('\n')}` }],
@@ -295,6 +295,7 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
       field_id: z.coerce.number().int().min(1).describe('Field ID to group by (from get_field_definitions) — works best with dropdown fields'),
     },
     async ({ list_id, field_id }) => {
+      try {
       const values = await api.getFieldValuesByList(list_id, field_id);
       if (values.length === 0) {
         return {
@@ -309,8 +310,8 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
       const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
       const fieldName = values[0]?.field?.name ?? `Field ${field_id}`;
       const lines = sorted.map(([label, count]) => `  ${label}: ${count}`);
-      const truncationNote = values.length >= 500
-        ? '\n\n⚠️ Result capped at 500 entries — this list may have more. Summary may be incomplete.'
+      const truncationNote = values.length >= 100
+        ? '\n\n⚠️ Result capped at 100 entries — this list may have more. Summary may be incomplete.'
         : '';
       return {
         content: [{
@@ -318,6 +319,7 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
           text: `Pipeline summary for list ${list_id} by "${fieldName}" (${values.length} entries total):\n\n${lines.join('\n')}${truncationNote}`,
         }],
       };
+      } catch (e) { return toolError(e); }
     }
   );
 

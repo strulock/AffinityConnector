@@ -9,13 +9,14 @@ import type { AffinityField, AffinityFieldValueChange } from '../affinity/types.
 
 // Human-readable labels for AffinityField.value_type numeric codes
 const VALUE_TYPE_LABELS: Record<number, string> = {
-  0: 'Text',
-  1: 'Number',
-  2: 'Date',
-  3: 'Location',
-  4: 'Person',
-  5: 'Organization',
-  6: 'Dropdown',
+  0: 'Person',
+  1: 'Organization',
+  2: 'Dropdown',
+  3: 'Number',
+  4: 'Date',
+  5: 'Location',
+  6: 'Text',
+  7: 'Ranked Dropdown',
 };
 
 function formatField(f: AffinityField): string {

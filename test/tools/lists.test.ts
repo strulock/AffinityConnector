@@ -270,7 +270,7 @@ describe('delete_field_value tool', () => {
 });
 
 const MOCK_SAVED_VIEW: AffinitySavedView = {
-  id: 10, list_id: 1, name: 'My View', creator_id: 99, is_public: true,
+  id: 10, name: 'My View', type: 'sheet', createdAt: '2023-01-01T00:00:00Z',
 };
 
 describe('add_to_list tool', () => {
@@ -323,7 +323,7 @@ describe('get_saved_views tool', () => {
     const text = result.content[0].text;
     expect(text).toContain('My View');
     expect(text).toContain('[view:10]');
-    expect(text).toContain('public');
+    expect(text).toContain('sheet');
     expect(text).toContain('1 saved view');
   });
 
@@ -335,13 +335,13 @@ describe('get_saved_views tool', () => {
     expect(result.content[0].text).toContain('No saved views found');
   });
 
-  it('labels private views correctly', async () => {
-    const privateView = { ...MOCK_SAVED_VIEW, is_public: false };
-    const mockApi = { ...BASE_MOCK_API(), getSavedViews: vi.fn().mockResolvedValue([privateView]) };
+  it('shows the view type in the output', async () => {
+    const kanbanView = { ...MOCK_SAVED_VIEW, type: 'kanban' };
+    const mockApi = { ...BASE_MOCK_API(), getSavedViews: vi.fn().mockResolvedValue([kanbanView]) };
     const { server, callTool } = makeMockServer();
     registerListTools(server, mockApi);
     const result = await callTool('get_saved_views', { list_id: 1 });
-    expect(result.content[0].text).toContain('private');
+    expect(result.content[0].text).toContain('kanban');
   });
 });
 

@@ -117,11 +117,11 @@ export class ListsApi {
    * Efficient for aggregation — single request instead of per-entry fetches.
    */
   async getFieldValuesByList(listId: number, fieldId: number): Promise<AffinityFieldValue[]> {
-    // Cap at 500 to avoid unbounded memory/timeout on large lists.
+    // Cap at 100 — the v1 field-values endpoint rejects page_size > 100 with a 422.
     const values = await this.client.get<AffinityFieldValue[]>('/field-values', {
       list_id: listId,
       field_id: fieldId,
-      page_size: 500,
+      page_size: 100,
     });
     return Array.isArray(values) ? values : [];
   }
@@ -137,7 +137,10 @@ export class ListsApi {
     const cached = await this.client.cache.get<AffinitySavedView[]>(cacheKey);
     if (cached) return cached;
 
-    const views = await this.client.get<AffinitySavedView[]>(`/lists/${listId}/saved-views`, undefined, 'v2');
+    const result = await this.client.get<{ data: AffinitySavedView[] }>(
+      `/lists/${listId}/saved-views`, undefined, 'v2',
+    );
+    const views = result.data ?? [];
     await this.client.cache.set(cacheKey, views, CACHE_TTL.list);
     return views;
   }

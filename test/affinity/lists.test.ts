@@ -235,10 +235,9 @@ const MOCK_ENTRY_RESULT: AffinityListEntry = {
 
 const MOCK_SAVED_VIEW: AffinitySavedView = {
   id: 10,
-  list_id: 1,
   name: 'My View',
-  creator_id: 99,
-  is_public: true,
+  type: 'sheet',
+  createdAt: '2023-01-01T00:00:00Z',
 };
 
 describe('ListsApi.addListEntry', () => {
@@ -281,7 +280,7 @@ describe('ListsApi.removeListEntry', () => {
 describe('ListsApi.getSavedViews', () => {
   it('returns saved views from the v2 API', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify([MOCK_SAVED_VIEW]), { status: 200 }))
+      Promise.resolve(new Response(JSON.stringify({ data: [MOCK_SAVED_VIEW] }), { status: 200 }))
     );
     vi.stubGlobal('fetch', fetchMock);
     const api = new ListsApi(new AffinityClient('key'));
@@ -294,7 +293,7 @@ describe('ListsApi.getSavedViews', () => {
 
   it('serves results from cache on the second call', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify([MOCK_SAVED_VIEW]), { status: 200 }))
+      Promise.resolve(new Response(JSON.stringify({ data: [MOCK_SAVED_VIEW] }), { status: 200 }))
     );
     vi.stubGlobal('fetch', fetchMock);
     const api = new ListsApi(new AffinityClient('key', { cache: makeKVMock() }));
