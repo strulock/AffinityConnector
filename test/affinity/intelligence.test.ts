@@ -25,21 +25,21 @@ describe('IntelligenceApi.getRelationshipStrength', () => {
     ));
     const client = new AffinityClient('key');
     const api = new IntelligenceApi(client);
-    const result = await api.getRelationshipStrength(1, 0);
+    const result = await api.getRelationshipStrength(1, 0, 99);
     expect(result).toEqual(EXPECTED_STRENGTH);
   });
 
-  it('requests with correct entity_id and entity_type params on the v1 base URL', async () => {
+  it('requests with external_id and internal_id params on the v1 base URL', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
       new Response(JSON.stringify(MOCK_V1_STRENGTH), { status: 200 })
     ));
     const client = new AffinityClient('key');
     const api = new IntelligenceApi(client);
-    await api.getRelationshipStrength(42, 1);
+    await api.getRelationshipStrength(42, 1, 99);
     const [url] = (fetch as ReturnType<typeof vi.fn>).mock.calls[0] as [string];
     expect(url).not.toContain('/v2/');
-    expect(url).toContain('entity_id=42');
-    expect(url).toContain('entity_type=1');
+    expect(url).toContain('external_id=42');
+    expect(url).toContain('internal_id=99');
   });
 
   it('serves the result from cache on the second call', async () => {
@@ -49,8 +49,8 @@ describe('IntelligenceApi.getRelationshipStrength', () => {
     vi.stubGlobal('fetch', fetchMock);
     const client = new AffinityClient('key', { cache: makeKVMock() });
     const api = new IntelligenceApi(client);
-    await api.getRelationshipStrength(1, 0);
-    await api.getRelationshipStrength(1, 0);
+    await api.getRelationshipStrength(1, 0, 99);
+    await api.getRelationshipStrength(1, 0, 99);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -62,8 +62,8 @@ describe('IntelligenceApi.getRelationshipStrength', () => {
     vi.stubGlobal('fetch', fetchMock);
     const client = new AffinityClient('key', { cache: makeKVMock() });
     const api = new IntelligenceApi(client);
-    const r1 = await api.getRelationshipStrength(1, 0);
-    const r2 = await api.getRelationshipStrength(2, 0);
+    const r1 = await api.getRelationshipStrength(1, 0, 99);
+    const r2 = await api.getRelationshipStrength(2, 0, 99);
     expect(r1.strength).toBe(75);
     expect(r2.strength).toBe(30);
     expect(fetchMock).toHaveBeenCalledTimes(2);

@@ -9,6 +9,7 @@ import { OrganizationsApi } from '../affinity/organizations.js';
 import { NotesApi } from '../affinity/notes.js';
 import { InteractionsV2Api } from '../affinity/interactions_v2.js';
 import { AffinityNotFoundError } from '../affinity/client.js';
+import { UtilityApi } from '../affinity/utility.js';
 import type { AffinityRelationshipStrength } from '../affinity/types.js';
 
 function strengthLabel(score: number): string {
@@ -25,7 +26,8 @@ export function registerIntelligenceTools(
   peopleApi: PeopleApi,
   orgsApi: OrganizationsApi,
   notesApi: NotesApi,
-  interactionsV2Api: InteractionsV2Api
+  interactionsV2Api: InteractionsV2Api,
+  utilityApi: UtilityApi,
 ): void {
   server.tool(
     'get_relationship_strength',
@@ -38,7 +40,8 @@ export function registerIntelligenceTools(
         .describe('Entity type: 0 = person, 1 = organization'),
     },
     async ({ entity_id, entity_type }) => {
-      const result = await api.getRelationshipStrength(entity_id, entity_type);
+      const { id: internalId } = await utilityApi.getCurrentUser();
+      const result = await api.getRelationshipStrength(entity_id, entity_type, internalId);
       const label = strengthLabel(result.strength);
       const lastActivity = result.last_activity_date
         ? new Date(result.last_activity_date).toLocaleDateString()
@@ -112,11 +115,12 @@ export function registerIntelligenceTools(
       }
 
       // 3. Fetch relationship strengths for up to MAX_CONNECTOR_CANDIDATES connectors in parallel
+      const { id: internalId } = await utilityApi.getCurrentUser();
       const candidateIds = [...connectorIds].slice(0, MAX_CONNECTOR_CANDIDATES);
       const strengthResults = await Promise.all(
         candidateIds.map(async (id) => {
           try {
-            const s = await api.getRelationshipStrength(id, 0);
+            const s = await api.getRelationshipStrength(id, 0, internalId);
             return { id, strength: s.strength, lastActivity: s.last_activity_date };
           } catch {
             // Strength unavailable for this connector — include them with score 0
@@ -183,6 +187,8 @@ export function registerIntelligenceTools(
 
       const sections: string[] = [];
 
+      const { id: internalId } = await utilityApi.getCurrentUser();
+
       if (person_id) {
         // Profile
         const person = await peopleApi.getById(person_id);
@@ -193,7 +199,7 @@ export function registerIntelligenceTools(
 
         // Relationship strength
         try {
-          const strength = await api.getRelationshipStrength(person_id, 0);
+          const strength = await api.getRelationshipStrength(person_id, 0, internalId);
           sections.push(`## Relationship Strength\n${strength.strength}/100 (${strengthLabel(strength.strength)})\nLast activity: ${strength.last_activity_date ? new Date(strength.last_activity_date).toLocaleDateString() : 'unknown'}`);
         } catch (e) {
           if (!(e instanceof AffinityNotFoundError)) throw e;
@@ -231,7 +237,7 @@ export function registerIntelligenceTools(
 
         // Relationship strength
         try {
-          const strength = await api.getRelationshipStrength(organization_id, 1);
+          const strength = await api.getRelationshipStrength(organization_id, 1, internalId);
           sections.push(`## Relationship Strength\n${strength.strength}/100 (${strengthLabel(strength.strength)})\nLast activity: ${strength.last_activity_date ? new Date(strength.last_activity_date).toLocaleDateString() : 'unknown'}`);
         } catch (e) {
           if (!(e instanceof AffinityNotFoundError)) throw e;

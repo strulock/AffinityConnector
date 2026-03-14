@@ -5,6 +5,7 @@ import { PeopleApi } from '../../src/affinity/people.js';
 import { OrganizationsApi } from '../../src/affinity/organizations.js';
 import { NotesApi } from '../../src/affinity/notes.js';
 import { InteractionsV2Api } from '../../src/affinity/interactions_v2.js';
+import { UtilityApi } from '../../src/affinity/utility.js';
 import { registerIntelligenceTools } from '../../src/tools/intelligence.js';
 import { makeMockServer } from '../helpers/mock-server.js';
 import type { AffinityPerson, AffinityOrganization, AffinityRelationshipStrength } from '../../src/affinity/types.js';
@@ -19,9 +20,23 @@ const MOCK_STRENGTH: AffinityRelationshipStrength = { entity_id: 1, entity_type:
 // v1 /relationships-strengths returns an array of { internal_id, external_id, strength } where strength is 0–1 float
 const MOCK_STRENGTH_V1 = [{ internal_id: 99, external_id: 1, strength: 0.75 }];
 
+// Mock current user response (v2 /auth/whoami)
+const MOCK_CURRENT_USER = {
+  user: { id: 99, firstName: 'Me', lastName: 'User', emailAddress: 'me@example.com' },
+  tenant: { id: 1, name: 'Test Org' },
+};
+
 afterEach(() => vi.unstubAllGlobals());
 
-function setupTools(fetchSequence: unknown[]) {
+// Default mock UtilityApi — returns user.id = 99
+function makeMockUtilityApi(): UtilityApi {
+  return {
+    getCurrentUser: vi.fn().mockResolvedValue({ id: 99, first_name: 'Me', last_name: 'User', email: 'me@example.com', organization_id: 1, organization_name: 'Test Org' }),
+    getRateLimit: vi.fn(),
+  } as unknown as UtilityApi;
+}
+
+function setupTools(fetchSequence: unknown[], utilityApi?: UtilityApi) {
   let callCount = 0;
   vi.stubGlobal('fetch', vi.fn().mockImplementation(() => {
     const resp = fetchSequence[callCount] ?? fetchSequence[fetchSequence.length - 1];
@@ -35,7 +50,7 @@ function setupTools(fetchSequence: unknown[]) {
   const notesApi = new NotesApi(client);
   const interactionsV2Api = new InteractionsV2Api(client);
   const { server, callTool } = makeMockServer();
-  registerIntelligenceTools(server, intelligenceApi, peopleApi, orgsApi, notesApi, interactionsV2Api);
+  registerIntelligenceTools(server, intelligenceApi, peopleApi, orgsApi, notesApi, interactionsV2Api, utilityApi ?? makeMockUtilityApi());
   return { callTool };
 }
 
@@ -119,7 +134,7 @@ describe('find_intro_path tool', () => {
     }));
     const client = new AffinityClient('key');
     const { server, callTool } = makeMockServer();
-    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client));
+    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client), makeMockUtilityApi());
     const result = await callTool('find_intro_path', { person_id: 1 });
     // Should not throw — connector shown with 0/100
     expect(result.content[0].text).toContain('/100');
@@ -137,7 +152,7 @@ describe('find_intro_path tool', () => {
     }));
     const client = new AffinityClient('key');
     const { server, callTool } = makeMockServer();
-    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client));
+    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client), makeMockUtilityApi());
     const result = await callTool('find_intro_path', { person_id: 1 });
     // Falls back to "Person {id}"
     expect(result.content[0].text).toContain('Person 2');
@@ -148,7 +163,7 @@ describe('find_intro_path tool', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 404 })));
     const client = new AffinityClient('key');
     const { server, callTool } = makeMockServer();
-    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client));
+    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client), makeMockUtilityApi());
     const result = await callTool('find_intro_path', { person_id: 999 });
     expect(result.content[0].text).toContain('not found');
     expect(result.content[0].text).toContain('999');
@@ -169,7 +184,7 @@ describe('find_intro_path tool', () => {
     }));
     const client = new AffinityClient('key');
     const { server, callTool } = makeMockServer();
-    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client));
+    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client), makeMockUtilityApi());
     const result = await callTool('find_intro_path', { person_id: 1 });
     const text = result.content[0].text;
     expect(text).toContain('Bob Jones');
@@ -258,7 +273,7 @@ describe('summarize_relationship tool', () => {
     }));
     const client = new AffinityClient('key');
     const { server, callTool } = makeMockServer();
-    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client));
+    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client), makeMockUtilityApi());
     const result = await callTool('summarize_relationship', { organization_id: 10 });
     expect(result.content[0].text).toContain('Acme');
   });
@@ -275,7 +290,7 @@ describe('summarize_relationship tool', () => {
     }));
     const client = new AffinityClient('key');
     const { server, callTool } = makeMockServer();
-    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client));
+    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client), makeMockUtilityApi());
     const result = await callTool('summarize_relationship', { person_id: 1 });
     // Should not throw — strength section simply omitted
     expect(result.content[0].text).toContain('Alice Smith');
@@ -352,7 +367,7 @@ describe('summarize_relationship tool', () => {
     }));
     const client = new AffinityClient('key');
     const { server, callTool } = makeMockServer();
-    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client));
+    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client), makeMockUtilityApi());
     await expect(callTool('summarize_relationship', { person_id: 1 })).rejects.toThrow();
   });
 
@@ -366,7 +381,7 @@ describe('summarize_relationship tool', () => {
     }));
     const client = new AffinityClient('key');
     const { server, callTool } = makeMockServer();
-    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client));
+    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client), makeMockUtilityApi());
     await expect(callTool('summarize_relationship', { organization_id: 10 })).rejects.toThrow();
   });
 
