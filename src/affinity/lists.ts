@@ -2,6 +2,7 @@
 
 import { AffinityClient } from './client.js';
 import { CACHE_TTL } from '../cache.js';
+import { extractCursor } from './pagination.js';
 import type { AffinityList, AffinityListEntry, AffinityFieldValue, AffinitySavedView } from './types.js';
 
 export class ListsApi {
@@ -184,14 +185,6 @@ export class ListsApi {
       created_at: e.createdAt ?? '',
     })) as AffinityListEntry[];
 
-    // Cursor for next page is in the `cursor` query param of pagination.nextUrl
-    let nextPageToken: string | undefined;
-    if (result.pagination?.nextUrl) {
-      try {
-        nextPageToken = new URL(result.pagination.nextUrl).searchParams.get('cursor') ?? undefined;
-      } catch { /* ignore malformed URL */ }
-    }
-
-    return { entries, nextPageToken };
+    return { entries, nextPageToken: extractCursor(result.pagination?.nextUrl) };
   }
 }

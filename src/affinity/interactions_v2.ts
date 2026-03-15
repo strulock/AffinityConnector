@@ -4,6 +4,7 @@
 // and returns { data: [...], pagination: { prevUrl, nextUrl } }.
 
 import { AffinityClient } from './client.js';
+import { extractCursor } from './pagination.js';
 import type {
   AffinityEmailV2,
   AffinityCallV2,
@@ -34,16 +35,6 @@ function buildParams(params: CommonParams): Record<string, unknown> {
   if (created_before) filters.push(`createdAt<=${created_before}`);
   if (filters.length) q.filter = filters.join('&');
   return q;
-}
-
-/** Extract cursor from v2 pagination.nextUrl */
-function extractCursor(nextUrl: string | null | undefined): string | undefined {
-  if (!nextUrl) return undefined;
-  try {
-    return new URL(nextUrl).searchParams.get('cursor') ?? undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 export class InteractionsV2Api {

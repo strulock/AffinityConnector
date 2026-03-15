@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { ListsApi } from '../affinity/lists.js';
 import { toolError } from './_error.js';
+import { displayValue } from './_format.js';
 import type {
   AffinityList,
   AffinityListEntry,
@@ -44,28 +45,9 @@ function formatEntry(entry: AffinityListEntry): string {
   return `[entry:${entry.id}] ${label}`;
 }
 
-/** Convert an Affinity field value to a display label for grouping. */
-function valueLabel(value: unknown): string {
-  if (value === null || value === undefined) return '(unset)';
-  if (typeof value === 'object') {
-    const v = value as Record<string, unknown>;
-    if (v.text != null) return String(v.text);
-    return JSON.stringify(value);
-  }
-  return String(value);
-}
-
 function formatFieldValue(fv: AffinityFieldValue): string {
   const name = fv.field?.name ?? `Field ${fv.field_id}`;
-  const value =
-    fv.value === null || fv.value === undefined
-      ? '(empty)'
-      : typeof fv.value === 'object'
-      ? (fv.value as Record<string, unknown>).text != null
-        ? String((fv.value as Record<string, unknown>).text)
-        : JSON.stringify(fv.value)
-      : String(fv.value);
-  return `${name}: ${value}`;
+  return `${name}: ${displayValue(fv.value)}`;
 }
 
 export function registerListTools(server: McpServer, api: ListsApi): void {
@@ -306,7 +288,7 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
       }
       const counts: Record<string, number> = {};
       for (const fv of values) {
-        const label = valueLabel(fv.value);
+        const label = displayValue(fv.value, '(unset)');
         counts[label] = (counts[label] ?? 0) + 1;
       }
       const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
