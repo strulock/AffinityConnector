@@ -221,10 +221,12 @@ export function registerIntelligenceTools(
           sections.push('## Recent Notes\nNone.');
         }
 
-        // Recent interactions (v2) — gracefully degrade if endpoints unavailable
+        // Recent interactions (v2) — gracefully degrade if endpoints unavailable (404)
         const [{ emails }, { meetings }] = await Promise.all([
-          interactionsV2Api.getEmails({ person_id, limit: 5 }).catch(() => ({ emails: [] as const })),
-          interactionsV2Api.getMeetings({ person_id, limit: 5 }).catch(() => ({ meetings: [] as const })),
+          interactionsV2Api.getEmails({ person_id, limit: 5 }).catch((e: unknown) =>
+            e instanceof AffinityNotFoundError ? { emails: [] as const } : Promise.reject(e)),
+          interactionsV2Api.getMeetings({ person_id, limit: 5 }).catch((e: unknown) =>
+            e instanceof AffinityNotFoundError ? { meetings: [] as const } : Promise.reject(e)),
         ]);
         const intLines = [
           ...emails.map(e => `[Email ${new Date(e.sent_at).toLocaleDateString()}] ${e.subject ?? '(no subject)'}`),
@@ -254,10 +256,12 @@ export function registerIntelligenceTools(
           sections.push('## Recent Notes\nNone.');
         }
 
-        // Recent interactions (v2) — gracefully degrade if endpoints unavailable
+        // Recent interactions (v2) — gracefully degrade if endpoints unavailable (404)
         const [{ emails: orgEmails }, { meetings: orgMeetings }] = await Promise.all([
-          interactionsV2Api.getEmails({ organization_id, limit: 5 }).catch(() => ({ emails: [] as const })),
-          interactionsV2Api.getMeetings({ organization_id, limit: 5 }).catch(() => ({ meetings: [] as const })),
+          interactionsV2Api.getEmails({ organization_id, limit: 5 }).catch((e: unknown) =>
+            e instanceof AffinityNotFoundError ? { emails: [] as const } : Promise.reject(e)),
+          interactionsV2Api.getMeetings({ organization_id, limit: 5 }).catch((e: unknown) =>
+            e instanceof AffinityNotFoundError ? { meetings: [] as const } : Promise.reject(e)),
         ]);
         const orgIntLines = [
           ...orgEmails.map(e => `[Email ${new Date(e.sent_at).toLocaleDateString()}] ${e.subject ?? '(no subject)'}`),
