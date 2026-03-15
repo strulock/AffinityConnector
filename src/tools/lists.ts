@@ -14,7 +14,7 @@ import type {
 const LIST_TYPE_LABELS: Record<number, string> = {
   0: 'Person',
   1: 'Organization',
-  2: 'Opportunity',
+  8: 'Opportunity',
 };
 
 function formatList(list: AffinityList): string {
@@ -61,7 +61,9 @@ function formatFieldValue(fv: AffinityFieldValue): string {
     fv.value === null || fv.value === undefined
       ? '(empty)'
       : typeof fv.value === 'object'
-      ? JSON.stringify(fv.value)
+      ? (fv.value as Record<string, unknown>).text != null
+        ? String((fv.value as Record<string, unknown>).text)
+        : JSON.stringify(fv.value)
       : String(fv.value);
   return `${name}: ${value}`;
 }

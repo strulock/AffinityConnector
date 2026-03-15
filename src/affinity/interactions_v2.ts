@@ -1,5 +1,7 @@
 // Affinity v2 interaction endpoints: /emails, /calls, /meetings, /chat-messages
 // These provide granular per-channel history with richer metadata than the v1 /interactions endpoint.
+// The v2 API uses `limit` (not `page_size`), `cursor` (not `page_token`),
+// and returns { data: [...], pagination: { prevUrl, nextUrl } }.
 
 import { AffinityClient } from './client.js';
 import type {
@@ -7,7 +9,7 @@ import type {
   AffinityCallV2,
   AffinityMeetingV2,
   AffinityChatMessageV2,
-  AffinityPaginatedResponse,
+  AffinityCursorPaginatedResponse,
 } from './types.js';
 
 type CommonParams = {
@@ -21,10 +23,27 @@ type CommonParams = {
 
 /** Normalise CommonParams into the query-param shape the v2 API expects. */
 function buildParams(params: CommonParams): Record<string, unknown> {
-  const { limit = 25, page_token, ...filters } = params;
-  const q: Record<string, unknown> = { page_size: limit, ...filters };
-  if (page_token) q.page_token = page_token;
+  const { limit = 25, page_token, person_id, organization_id, created_after, created_before } = params;
+  const q: Record<string, unknown> = { limit };
+  if (page_token) q.cursor = page_token;
+  // v2 uses filter strings, not direct query params for entity filtering
+  const filters: string[] = [];
+  if (person_id != null) filters.push(`person_id=${person_id}`);
+  if (organization_id != null) filters.push(`organization_id=${organization_id}`);
+  if (created_after) filters.push(`createdAt>=${created_after}`);
+  if (created_before) filters.push(`createdAt<=${created_before}`);
+  if (filters.length) q.filter = filters.join('&');
   return q;
+}
+
+/** Extract cursor from v2 pagination.nextUrl */
+function extractCursor(nextUrl: string | null | undefined): string | undefined {
+  if (!nextUrl) return undefined;
+  try {
+    return new URL(nextUrl).searchParams.get('cursor') ?? undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export class InteractionsV2Api {
@@ -34,14 +53,14 @@ export class InteractionsV2Api {
   async getEmails(
     params: CommonParams = {},
   ): Promise<{ emails: AffinityEmailV2[]; nextPageToken?: string }> {
-    const result = await this.client.get<AffinityPaginatedResponse<AffinityEmailV2>>(
+    const result = await this.client.get<AffinityCursorPaginatedResponse<AffinityEmailV2>>(
       '/emails',
       buildParams(params),
       'v2',
     );
     return {
       emails: result.data ?? [],
-      nextPageToken: result.next_page_token ?? undefined,
+      nextPageToken: extractCursor(result.pagination?.nextUrl),
     };
   }
 
@@ -49,14 +68,14 @@ export class InteractionsV2Api {
   async getCalls(
     params: CommonParams = {},
   ): Promise<{ calls: AffinityCallV2[]; nextPageToken?: string }> {
-    const result = await this.client.get<AffinityPaginatedResponse<AffinityCallV2>>(
+    const result = await this.client.get<AffinityCursorPaginatedResponse<AffinityCallV2>>(
       '/calls',
       buildParams(params),
       'v2',
     );
     return {
       calls: result.data ?? [],
-      nextPageToken: result.next_page_token ?? undefined,
+      nextPageToken: extractCursor(result.pagination?.nextUrl),
     };
   }
 
@@ -64,14 +83,14 @@ export class InteractionsV2Api {
   async getMeetings(
     params: CommonParams = {},
   ): Promise<{ meetings: AffinityMeetingV2[]; nextPageToken?: string }> {
-    const result = await this.client.get<AffinityPaginatedResponse<AffinityMeetingV2>>(
+    const result = await this.client.get<AffinityCursorPaginatedResponse<AffinityMeetingV2>>(
       '/meetings',
       buildParams(params),
       'v2',
     );
     return {
       meetings: result.data ?? [],
-      nextPageToken: result.next_page_token ?? undefined,
+      nextPageToken: extractCursor(result.pagination?.nextUrl),
     };
   }
 
@@ -79,14 +98,14 @@ export class InteractionsV2Api {
   async getChatMessages(
     params: CommonParams = {},
   ): Promise<{ messages: AffinityChatMessageV2[]; nextPageToken?: string }> {
-    const result = await this.client.get<AffinityPaginatedResponse<AffinityChatMessageV2>>(
+    const result = await this.client.get<AffinityCursorPaginatedResponse<AffinityChatMessageV2>>(
       '/chat-messages',
       buildParams(params),
       'v2',
     );
     return {
       messages: result.data ?? [],
-      nextPageToken: result.next_page_token ?? undefined,
+      nextPageToken: extractCursor(result.pagination?.nextUrl),
     };
   }
 }

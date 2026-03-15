@@ -36,7 +36,9 @@ function formatChange(c: AffinityFieldValueChange): string {
     c.value === null || c.value === undefined
       ? '(cleared)'
       : typeof c.value === 'object'
-      ? JSON.stringify(c.value)
+      ? (c.value as Record<string, unknown>).text != null
+        ? String((c.value as Record<string, unknown>).text)
+        : JSON.stringify(c.value)
       : String(c.value);
   const target = c.list_entry_id
     ? `list entry ${c.list_entry_id}`

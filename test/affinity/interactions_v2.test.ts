@@ -26,9 +26,10 @@ const MOCK_CHAT: AffinityChatMessageV2 = {
 
 afterEach(() => vi.unstubAllGlobals());
 
-function mockV2Response<T>(data: T[], next_page_token: string | null = null) {
+function mockV2Response<T>(data: T[], nextUrl: string | null = null) {
+  const body = { data, pagination: { prevUrl: null, nextUrl } };
   vi.stubGlobal('fetch', vi.fn().mockImplementation(() =>
-    Promise.resolve(new Response(JSON.stringify({ data, next_page_token }), { status: 200 }))
+    Promise.resolve(new Response(JSON.stringify(body), { status: 200 }))
   ));
 }
 
@@ -42,7 +43,7 @@ describe('InteractionsV2Api.getEmails', () => {
   });
 
   it('returns nextPageToken when present', async () => {
-    mockV2Response([MOCK_EMAIL], 'tok-next');
+    mockV2Response([MOCK_EMAIL], 'https://api.affinity.co/v2/emails?cursor=tok-next');
     const api = new InteractionsV2Api(new AffinityClient('key'));
     const result = await api.getEmails();
     expect(result.nextPageToken).toBe('tok-next');
@@ -59,7 +60,7 @@ describe('InteractionsV2Api.getEmails', () => {
 
   it('uses the v2 base URL', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+      Promise.resolve(new Response(JSON.stringify({ data: [], pagination: {} }), { status: 200 }))
     );
     vi.stubGlobal('fetch', fetchMock);
     const api = new InteractionsV2Api(new AffinityClient('key'));
@@ -69,15 +70,15 @@ describe('InteractionsV2Api.getEmails', () => {
     expect(url).toContain('/emails');
   });
 
-  it('includes page_token in URL when provided', async () => {
+  it('includes cursor in URL when page_token provided', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+      Promise.resolve(new Response(JSON.stringify({ data: [], pagination: {} }), { status: 200 }))
     );
     vi.stubGlobal('fetch', fetchMock);
     const api = new InteractionsV2Api(new AffinityClient('key'));
     await api.getEmails({ page_token: 'tok-e' });
     const [url] = fetchMock.mock.calls[0] as [string];
-    expect(url).toContain('page_token=tok-e');
+    expect(url).toContain('cursor=tok-e');
   });
 });
 
@@ -114,15 +115,15 @@ describe('InteractionsV2Api.getMeetings', () => {
     expect((await api.getMeetings()).meetings).toEqual([]);
   });
 
-  it('includes page_token in URL when provided', async () => {
+  it('includes cursor in URL when page_token provided', async () => {
     const fetchMock = vi.fn().mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 }))
+      Promise.resolve(new Response(JSON.stringify({ data: [], pagination: {} }), { status: 200 }))
     );
     vi.stubGlobal('fetch', fetchMock);
     const api = new InteractionsV2Api(new AffinityClient('key'));
     await api.getMeetings({ page_token: 'tok-m' });
     const [url] = fetchMock.mock.calls[0] as [string];
-    expect(url).toContain('page_token=tok-m');
+    expect(url).toContain('cursor=tok-m');
   });
 });
 

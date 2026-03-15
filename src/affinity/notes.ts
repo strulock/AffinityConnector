@@ -26,9 +26,10 @@ export class NotesApi {
     const queryParams: Record<string, unknown> = { page_size: limit, ...filters };
     if (page_token) queryParams.page_token = page_token;
 
-    // v1 /notes returns an array directly
-    const result = await this.client.get<AffinityNote[]>('/notes', queryParams);
-    const response = { notes: Array.isArray(result) ? result : [] };
+    // v1 /notes returns { notes: [...] } (wrapped) or occasionally a plain array
+    const raw = await this.client.get<AffinityNote[] | { notes: AffinityNote[] }>('/notes', queryParams);
+    const notes = Array.isArray(raw) ? raw : (raw as { notes?: AffinityNote[] }).notes ?? [];
+    const response = { notes };
     await this.client.cache.set(cacheKey, response, CACHE_TTL.notes);
     return response;
   }

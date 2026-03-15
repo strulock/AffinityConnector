@@ -37,13 +37,15 @@ export class RemindersApi {
     organization_ids?: number[];
     opportunity_ids?: number[];
   }): Promise<AffinityReminder> {
-    return this.client.post<AffinityReminder>('/reminders', {
+    const body: Record<string, unknown> = {
       content: params.content,
       due_date: params.due_date,
-      person_ids: params.person_ids ?? [],
-      organization_ids: params.organization_ids ?? [],
-      opportunity_ids: params.opportunity_ids ?? [],
-    });
+    };
+    // Only include association arrays if non-empty — the v1 API rejects empty arrays
+    if (params.person_ids?.length) body.person_ids = params.person_ids;
+    if (params.organization_ids?.length) body.organization_ids = params.organization_ids;
+    if (params.opportunity_ids?.length) body.opportunity_ids = params.opportunity_ids;
+    return this.client.post<AffinityReminder>('/reminders', body);
   }
 
   /**

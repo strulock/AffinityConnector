@@ -21,8 +21,9 @@ export class OpportunitiesApi {
     if (term) params.term = term;
     if (listId != null) params.list_id = listId;
     if (limit != null) params.page_size = limit;
-    const result = await this.client.get<AffinityOpportunity[]>('/opportunities', params);
-    return Array.isArray(result) ? result : [];
+    // v1 /opportunities returns { opportunities: [...] } (wrapped) or occasionally a plain array
+    const raw = await this.client.get<AffinityOpportunity[] | { opportunities: AffinityOpportunity[] }>('/opportunities', params);
+    return Array.isArray(raw) ? raw : (raw as { opportunities?: AffinityOpportunity[] }).opportunities ?? [];
   }
 
   /** Fetch a single opportunity by ID. Returns null if not found. Cached at 5 min TTL. */
