@@ -40,18 +40,25 @@ export function registerIntelligenceTools(
         .describe('Entity type: 0 = person, 1 = organization'),
     },
     async ({ entity_id, entity_type }) => {
+      if (entity_type === 1) {
+        return {
+          content: [{
+            type: 'text',
+            text: 'Relationship strength is only available for people (entity_type 0), not organizations. The Affinity API requires a person ID for the /relationships-strengths endpoint. Try using a person_id associated with this organization instead.',
+          }],
+        };
+      }
       const { id: internalId } = await utilityApi.getCurrentUser();
       const result = await api.getRelationshipStrength(entity_id, entity_type, internalId);
       const label = strengthLabel(result.strength);
       const lastActivity = result.last_activity_date
         ? new Date(result.last_activity_date).toLocaleDateString()
         : 'unknown';
-      const typeLabel = entity_type === 0 ? 'person' : 'organization';
       return {
         content: [
           {
             type: 'text',
-            text: `Relationship strength with ${typeLabel} ${entity_id}: ${result.strength}/100 (${label})\nLast activity: ${lastActivity}`,
+            text: `Relationship strength with person ${entity_id}: ${result.strength}/100 (${label})\nLast activity: ${lastActivity}`,
           },
         ],
       };
@@ -235,13 +242,8 @@ export function registerIntelligenceTools(
         const dates = org.interaction_dates;
         sections.push(`## Profile: ${org.name}\nDomain: ${domain}\nPeople: ${org.person_ids?.length ?? 0}\nLast interaction: ${dates?.last_interaction_date ?? 'none'}\nLast email: ${dates?.last_email_date ?? 'none'}\nLast meeting: ${dates?.last_event_date ?? 'none'}`);
 
-        // Relationship strength
-        try {
-          const strength = await api.getRelationshipStrength(organization_id, 1, internalId);
-          sections.push(`## Relationship Strength\n${strength.strength}/100 (${strengthLabel(strength.strength)})\nLast activity: ${strength.last_activity_date ? new Date(strength.last_activity_date).toLocaleDateString() : 'unknown'}`);
-        } catch (e) {
-          if (!(e instanceof AffinityNotFoundError)) throw e;
-        }
+        // Relationship strength — not available for organizations via the API
+        sections.push('## Relationship Strength\nNot available for organizations (Affinity only provides person-level relationship strength).');
 
         // Recent notes
         const { notes } = await notesApi.getNotes({ organization_id, limit: 5 });

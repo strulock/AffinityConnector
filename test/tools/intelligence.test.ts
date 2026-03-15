@@ -64,12 +64,11 @@ describe('get_relationship_strength tool', () => {
     expect(text).toContain('person 1');
   });
 
-  it('returns strength score for an organization', async () => {
-    const { callTool } = setupTools([[{ internal_id: 99, external_id: 10, strength: 0.85 }]]);
+  it('returns informative message for an organization', async () => {
+    const { callTool } = setupTools([]);
     const result = await callTool('get_relationship_strength', { entity_id: 10, entity_type: 1 });
     const text = result.content[0].text;
-    expect(text).toContain('organization 10');
-    expect(text).toContain('Very Strong');
+    expect(text).toContain('only available for people');
   });
 
   it('shows "unknown" when last_activity_date is null', async () => {
@@ -229,10 +228,9 @@ describe('summarize_relationship tool', () => {
     expect(text).toContain('Recent Interactions');
   });
 
-  it('aggregates org profile, strength, notes, and interactions', async () => {
+  it('aggregates org profile, notes, and interactions (no strength for orgs)', async () => {
     const { callTool } = setupTools([
       MOCK_ORG,              // getById (profile)
-      MOCK_STRENGTH_V1,      // getRelationshipStrength
       [],               // getNotes
       { data: [] },     // getEmails (v2)
       { data: [] },     // getMeetings (v2)
@@ -240,42 +238,31 @@ describe('summarize_relationship tool', () => {
     const result = await callTool('summarize_relationship', { organization_id: 10 });
     const text = result.content[0].text;
     expect(text).toContain('Acme');
-    expect(text).toContain('75/100');
+    expect(text).toContain('Not available for organizations');
   });
 
   it('includes org notes when present', async () => {
     const note = { id: 1, person_ids: [], organization_ids: [10], opportunity_ids: [], creator_id: 99, content: 'Key account', type: 0, is_deleted: false, created_at: '2024-01-15T00:00:00Z' };
-    const orgStrength = MOCK_STRENGTH_V1;
-    const { callTool } = setupTools([MOCK_ORG, orgStrength, [note], { data: [] }, { data: [] }]);
+    const { callTool } = setupTools([MOCK_ORG, [note], { data: [] }, { data: [] }]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
     expect(result.content[0].text).toContain('Key account');
   });
 
   it('includes org interactions when present (meeting type)', async () => {
     const meeting = { id: 'm1', title: null, start_time: '2024-01-10T00:00:00Z', end_time: null, created_at: '2024-01-10T00:00:00Z', person_ids: [], organization_ids: [10] };
-    const orgStrength = MOCK_STRENGTH_V1;
-    const { callTool } = setupTools([MOCK_ORG, orgStrength, [], { data: [] }, { data: [meeting] }]);
+    const { callTool } = setupTools([MOCK_ORG, [], { data: [] }, { data: [meeting] }]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
     const text = result.content[0].text;
     expect(text).toContain('Meeting');
     expect(text).toContain('(no title)');
   });
 
-  it('handles NotFoundError from org getRelationshipStrength gracefully', async () => {
-    let call = 0;
-    vi.unstubAllGlobals();
-    vi.stubGlobal('fetch', vi.fn().mockImplementation(() => {
-      call++;
-      if (call === 1) return Promise.resolve(new Response(JSON.stringify(MOCK_ORG), { status: 200 }));
-      if (call === 2) return Promise.resolve(new Response('{}', { status: 404 }));
-      // getNotes returns [], getEmails returns {data:[]}, getMeetings returns {data:[]}
-      return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
-    }));
-    const client = new AffinityClient('key');
-    const { server, callTool } = makeMockServer();
-    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client), makeMockUtilityApi());
+  it('skips relationship strength for org (not supported by API)', async () => {
+    const { callTool } = setupTools([MOCK_ORG, [], { data: [] }, { data: [] }]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
-    expect(result.content[0].text).toContain('Acme');
+    const text = result.content[0].text;
+    expect(text).toContain('Acme');
+    expect(text).toContain('Not available for organizations');
   });
 
   it('handles NotFoundError from getRelationshipStrength gracefully', async () => {
@@ -328,9 +315,8 @@ describe('summarize_relationship tool', () => {
   });
 
   it('includes email in org interactions when present', async () => {
-    const orgStrength = MOCK_STRENGTH_V1;
     const email = { id: 'e2', subject: null, sent_at: '2024-01-09T00:00:00Z', created_at: '2024-01-09T00:00:00Z', person_ids: [], organization_ids: [10] };
-    const { callTool } = setupTools([MOCK_ORG, orgStrength, [], { data: [email] }, { data: [] }]);
+    const { callTool } = setupTools([MOCK_ORG, [], { data: [email] }, { data: [] }]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
     expect(result.content[0].text).toContain('(no subject)');
   });
@@ -344,8 +330,7 @@ describe('summarize_relationship tool', () => {
 
   it('falls back to domains[0] when org domain is null', async () => {
     const orgNoDomain = { ...MOCK_ORG, domain: null, domains: ['fallback.com'] };
-    const orgStrength = MOCK_STRENGTH_V1;
-    const { callTool } = setupTools([orgNoDomain, orgStrength, [], { data: [] }, { data: [] }]);
+    const { callTool } = setupTools([orgNoDomain, [], { data: [] }, { data: [] }]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
     expect(result.content[0].text).toContain('fallback.com');
   });
@@ -371,7 +356,8 @@ describe('summarize_relationship tool', () => {
     await expect(callTool('summarize_relationship', { person_id: 1 })).rejects.toThrow();
   });
 
-  it('re-throws non-404 errors from getRelationshipStrength for organization', async () => {
+  it('skips strength for org summarize and does not throw', async () => {
+    // Since org strength is now skipped entirely, 500 from notes/interactions should still propagate
     let call = 0;
     vi.unstubAllGlobals();
     vi.stubGlobal('fetch', vi.fn().mockImplementation(() => {
@@ -382,13 +368,13 @@ describe('summarize_relationship tool', () => {
     const client = new AffinityClient('key');
     const { server, callTool } = makeMockServer();
     registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client), makeMockUtilityApi());
+    // getNotes (call 2) will 500 → should throw
     await expect(callTool('summarize_relationship', { organization_id: 10 })).rejects.toThrow();
   });
 
-  it('shows "unknown" last activity for org when strength date is null', async () => {
-    // v1 /relationships-strengths never returns last_activity_date, so it's always null → "unknown"
-    const { callTool } = setupTools([MOCK_ORG, MOCK_STRENGTH_V1, [], { data: [] }, { data: [] }]);
+  it('shows org strength not available message', async () => {
+    const { callTool } = setupTools([MOCK_ORG, [], { data: [] }, { data: [] }]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
-    expect(result.content[0].text).toContain('unknown');
+    expect(result.content[0].text).toContain('Not available for organizations');
   });
 });

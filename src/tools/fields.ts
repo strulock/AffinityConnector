@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FieldsApi } from '../affinity/fields.js';
+import { displayValue } from './_format.js';
 import type { AffinityField, AffinityFieldValueChange } from '../affinity/types.js';
 
 // Human-readable labels for AffinityField.value_type numeric codes
@@ -32,12 +33,7 @@ function formatField(f: AffinityField): string {
 
 function formatChange(c: AffinityFieldValueChange): string {
   const date = new Date(c.changed_at).toLocaleDateString();
-  const value =
-    c.value === null || c.value === undefined
-      ? '(cleared)'
-      : typeof c.value === 'object'
-      ? JSON.stringify(c.value)
-      : String(c.value);
+  const value = displayValue(c.value, '(cleared)');
   const target = c.list_entry_id
     ? `list entry ${c.list_entry_id}`
     : c.entity_id
