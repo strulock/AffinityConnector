@@ -39,7 +39,10 @@ function formatChange(c: AffinityFieldValueChange): string {
     : c.entity_id
     ? `entity ${c.entity_id}`
     : 'unknown';
-  return `[change:${c.id}] ${date} — ${target} → "${value}" (by user ${c.changed_by_id})`;
+  const changerName = c.changer
+    ? [c.changer.first_name, c.changer.last_name].filter(Boolean).join(' ') || `user ${c.changer.id}`
+    : 'unknown';
+  return `[change:${c.id}] ${date} — ${target} → "${value}" (by ${changerName})`;
 }
 
 export function registerFieldTools(server: McpServer, api: FieldsApi): void {

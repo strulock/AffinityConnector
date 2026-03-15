@@ -221,10 +221,10 @@ export function registerIntelligenceTools(
           sections.push('## Recent Notes\nNone.');
         }
 
-        // Recent interactions (v2)
+        // Recent interactions (v2) — gracefully degrade if endpoints unavailable
         const [{ emails }, { meetings }] = await Promise.all([
-          interactionsV2Api.getEmails({ person_id, limit: 5 }),
-          interactionsV2Api.getMeetings({ person_id, limit: 5 }),
+          interactionsV2Api.getEmails({ person_id, limit: 5 }).catch(() => ({ emails: [] as const })),
+          interactionsV2Api.getMeetings({ person_id, limit: 5 }).catch(() => ({ meetings: [] as const })),
         ]);
         const intLines = [
           ...emails.map(e => `[Email ${new Date(e.sent_at).toLocaleDateString()}] ${e.subject ?? '(no subject)'}`),
@@ -254,10 +254,10 @@ export function registerIntelligenceTools(
           sections.push('## Recent Notes\nNone.');
         }
 
-        // Recent interactions (v2)
+        // Recent interactions (v2) — gracefully degrade if endpoints unavailable
         const [{ emails: orgEmails }, { meetings: orgMeetings }] = await Promise.all([
-          interactionsV2Api.getEmails({ organization_id, limit: 5 }),
-          interactionsV2Api.getMeetings({ organization_id, limit: 5 }),
+          interactionsV2Api.getEmails({ organization_id, limit: 5 }).catch(() => ({ emails: [] as const })),
+          interactionsV2Api.getMeetings({ organization_id, limit: 5 }).catch(() => ({ meetings: [] as const })),
         ]);
         const orgIntLines = [
           ...orgEmails.map(e => `[Email ${new Date(e.sent_at).toLocaleDateString()}] ${e.subject ?? '(no subject)'}`),

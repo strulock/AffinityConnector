@@ -13,7 +13,7 @@ const WEBHOOK_RECENT_KEY = 'webhook:recent';
 const DEFAULT_WEBHOOK_URL = 'https://affinity.trulock.com/webhook';
 
 function formatWebhook(w: AffinityWebhookSubscription): string {
-  const events = w.subscriptions.length ? w.subscriptions.join(', ') : 'all';
+  const events = w.subscriptions?.length ? w.subscriptions.join(', ') : 'all';
   return `[webhook:${w.id}] ${w.disabled ? 'disabled' : 'active'} — ${w.webhook_url}\n  Events: ${events}`;
 }
 
