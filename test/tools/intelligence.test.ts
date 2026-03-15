@@ -249,7 +249,7 @@ describe('summarize_relationship tool', () => {
   });
 
   it('includes org interactions when present (meeting type)', async () => {
-    const meeting = { id: 'm1', title: null, start_time: '2024-01-10T00:00:00Z', end_time: null, created_at: '2024-01-10T00:00:00Z', person_ids: [], organization_ids: [10] };
+    const meeting = { id: 1, title: null, startTime: '2024-01-10T00:00:00Z', endTime: null, createdAt: '2024-01-10T00:00:00Z' };
     const { callTool } = setupTools([MOCK_ORG, [], { data: [] }, { data: [meeting] }]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
     const text = result.content[0].text;
@@ -291,22 +291,22 @@ describe('summarize_relationship tool', () => {
   });
 
   it('includes interaction details when interactions are present', async () => {
-    const email = { id: 'e1', subject: 'Intro call', sent_at: '2024-01-10T00:00:00Z', created_at: '2024-01-10T00:00:00Z', person_ids: [1], organization_ids: [] };
+    const email = { id: 1, subject: 'Intro call', sentAt: '2024-01-10T00:00:00Z', createdAt: '2024-01-10T00:00:00Z' };
     const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH_V1, [], { data: [email] }, { data: [] }]);
     const result = await callTool('summarize_relationship', { person_id: 1 });
     expect(result.content[0].text).toContain('Intro call');
   });
 
   it('includes meeting with title in person interactions', async () => {
-    const meeting = { id: 'm1', title: 'Strategy call', start_time: '2024-01-11T00:00:00Z', end_time: null, created_at: '2024-01-11T00:00:00Z', person_ids: [1], organization_ids: [] };
+    const meeting = { id: 1, title: 'Strategy call', startTime: '2024-01-11T00:00:00Z', endTime: null, createdAt: '2024-01-11T00:00:00Z' };
     const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH_V1, [], { data: [] }, { data: [meeting] }]);
     const result = await callTool('summarize_relationship', { person_id: 1 });
     expect(result.content[0].text).toContain('Strategy call');
   });
 
   it('shows fallback labels when person email subject and meeting title are null', async () => {
-    const email = { id: 'e3', subject: null, sent_at: '2024-01-08T00:00:00Z', created_at: '2024-01-08T00:00:00Z', person_ids: [1], organization_ids: [] };
-    const meeting = { id: 'm2', title: null, start_time: '2024-01-09T00:00:00Z', end_time: null, created_at: '2024-01-09T00:00:00Z', person_ids: [1], organization_ids: [] };
+    const email = { id: 3, subject: null, sentAt: '2024-01-08T00:00:00Z', createdAt: '2024-01-08T00:00:00Z' };
+    const meeting = { id: 2, title: null, startTime: '2024-01-09T00:00:00Z', endTime: null, createdAt: '2024-01-09T00:00:00Z' };
     const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH_V1, [], { data: [email] }, { data: [meeting] }]);
     const result = await callTool('summarize_relationship', { person_id: 1 });
     const text = result.content[0].text;
@@ -315,7 +315,7 @@ describe('summarize_relationship tool', () => {
   });
 
   it('includes email in org interactions when present', async () => {
-    const email = { id: 'e2', subject: null, sent_at: '2024-01-09T00:00:00Z', created_at: '2024-01-09T00:00:00Z', person_ids: [], organization_ids: [10] };
+    const email = { id: 2, subject: null, sentAt: '2024-01-09T00:00:00Z', createdAt: '2024-01-09T00:00:00Z' };
     const { callTool } = setupTools([MOCK_ORG, [], { data: [email] }, { data: [] }]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
     expect(result.content[0].text).toContain('(no subject)');

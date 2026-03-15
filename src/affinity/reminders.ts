@@ -46,7 +46,8 @@ export class RemindersApi {
       opportunity_ids?: number[];
     } = {
       content: params.content,
-      due_date: params.due_date,
+      // v1 API expects ISO 8601 datetime; append time if only date provided
+      due_date: params.due_date.includes('T') ? params.due_date : `${params.due_date}T00:00:00Z`,
       ...(params.person_ids?.length ? { person_ids: params.person_ids } : {}),
       ...(params.organization_ids?.length ? { organization_ids: params.organization_ids } : {}),
       ...(params.opportunity_ids?.length ? { opportunity_ids: params.opportunity_ids } : {}),
@@ -62,7 +63,11 @@ export class RemindersApi {
     reminderId: number,
     params: { content?: string; due_date?: string; completed?: boolean },
   ): Promise<AffinityReminder> {
-    return this.client.put<AffinityReminder>(`/reminders/${reminderId}`, params);
+    const body = { ...params };
+    if (body.due_date && !body.due_date.includes('T')) {
+      body.due_date = `${body.due_date}T00:00:00Z`;
+    }
+    return this.client.put<AffinityReminder>(`/reminders/${reminderId}`, body);
   }
 
   /** Delete a reminder (v1 DELETE /reminders/{id}). */
