@@ -63,7 +63,11 @@ export class RemindersApi {
     reminderId: number,
     params: { content?: string; due_date?: string; completed?: boolean },
   ): Promise<AffinityReminder> {
-    return this.client.put<AffinityReminder>(`/reminders/${reminderId}`, params);
+    const body = { ...params };
+    if (body.due_date && !body.due_date.includes('T')) {
+      body.due_date = `${body.due_date}T00:00:00Z`;
+    }
+    return this.client.put<AffinityReminder>(`/reminders/${reminderId}`, body);
   }
 
   /** Delete a reminder (v1 DELETE /reminders/{id}). */
