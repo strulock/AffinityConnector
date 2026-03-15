@@ -46,7 +46,8 @@ export class RemindersApi {
       opportunity_ids?: number[];
     } = {
       content: params.content,
-      due_date: params.due_date,
+      // v1 API expects ISO 8601 datetime; append time if only date provided
+      due_date: params.due_date.includes('T') ? params.due_date : `${params.due_date}T00:00:00Z`,
       ...(params.person_ids?.length ? { person_ids: params.person_ids } : {}),
       ...(params.organization_ids?.length ? { organization_ids: params.organization_ids } : {}),
       ...(params.opportunity_ids?.length ? { opportunity_ids: params.opportunity_ids } : {}),

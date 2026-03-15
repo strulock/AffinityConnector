@@ -53,14 +53,14 @@ export function registerActivityTimelineTool(
 
       const items: TimelineItem[] = [
         ...emails.map(e => ({
-          date: e.sent_at,
+          date: e.sentAt,
           type: 'Email' as const,
           label: `Subject: ${e.subject ?? '(no subject)'}`,
         })),
         ...meetings.map(m => ({
-          date: m.start_time,
+          date: m.startTime,
           type: 'Meeting' as const,
-          label: `${m.title ?? '(no title)'}${meetingDuration(m.start_time, m.end_time)}`,
+          label: `${m.title ?? '(no title)'}${meetingDuration(m.startTime, m.endTime)}`,
         })),
         ...notes.map(n => ({
           date: n.created_at,

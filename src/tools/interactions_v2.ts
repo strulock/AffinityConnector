@@ -13,21 +13,22 @@ import type {
 
 function formatEmail(e: AffinityEmailV2): string {
   const subject = e.subject ? ` — "${e.subject}"` : '';
-  return `[email:${e.id}] ${e.sent_at}${subject}`;
+  return `[email:${e.id}] ${e.sentAt}${subject}`;
 }
 
 function formatCall(c: AffinityCallV2): string {
-  return `[call:${c.id}] ${c.start_time}`;
+  const title = c.title ? ` — "${c.title}"` : '';
+  return `[call:${c.id}] ${c.startTime}${title}`;
 }
 
 function formatMeeting(m: AffinityMeetingV2): string {
   const title = m.title ? ` — "${m.title}"` : '';
-  return `[meeting:${m.id}] ${m.start_time}${title}`;
+  return `[meeting:${m.id}] ${m.startTime}${title}`;
 }
 
 function formatChatMessage(msg: AffinityChatMessageV2): string {
   const snippet = msg.content ? ` — ${msg.content.slice(0, 120)}` : '';
-  return `[chat:${msg.id}] ${msg.sent_at}${snippet}`;
+  return `[chat:${msg.id}] ${msg.sentAt}${snippet}`;
 }
 
 const COMMON_PARAMS = {

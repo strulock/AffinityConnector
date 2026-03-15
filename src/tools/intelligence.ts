@@ -229,8 +229,8 @@ export function registerIntelligenceTools(
             e instanceof AffinityNotFoundError ? { meetings: [] as const } : Promise.reject(e)),
         ]);
         const intLines = [
-          ...emails.map(e => `[Email ${new Date(e.sent_at).toLocaleDateString()}] ${e.subject ?? '(no subject)'}`),
-          ...meetings.map(m => `[Meeting ${new Date(m.start_time).toLocaleDateString()}] ${m.title ?? '(no title)'}`),
+          ...emails.map(e => `[Email ${new Date(e.sentAt).toLocaleDateString()}] ${e.subject ?? '(no subject)'}`),
+          ...meetings.map(m => `[Meeting ${new Date(m.startTime).toLocaleDateString()}] ${m.title ?? '(no title)'}`),
         ];
         if (intLines.length) {
           sections.push(`## Recent Interactions (${intLines.length})\n${intLines.join('\n')}`);
@@ -264,8 +264,8 @@ export function registerIntelligenceTools(
             e instanceof AffinityNotFoundError ? { meetings: [] as const } : Promise.reject(e)),
         ]);
         const orgIntLines = [
-          ...orgEmails.map(e => `[Email ${new Date(e.sent_at).toLocaleDateString()}] ${e.subject ?? '(no subject)'}`),
-          ...orgMeetings.map(m => `[Meeting ${new Date(m.start_time).toLocaleDateString()}] ${m.title ?? '(no title)'}`),
+          ...orgEmails.map(e => `[Email ${new Date(e.sentAt).toLocaleDateString()}] ${e.subject ?? '(no subject)'}`),
+          ...orgMeetings.map(m => `[Meeting ${new Date(m.startTime).toLocaleDateString()}] ${m.title ?? '(no title)'}`),
         ];
         if (orgIntLines.length) {
           sections.push(`## Recent Interactions (${orgIntLines.length})\n${orgIntLines.join('\n')}`);

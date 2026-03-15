@@ -6,28 +6,27 @@ import { makeMockServer } from '../helpers/mock-server.js';
 import type { AffinityEmailV2, AffinityCallV2, AffinityMeetingV2, AffinityChatMessageV2 } from '../../src/affinity/types.js';
 
 const MOCK_EMAIL: AffinityEmailV2 = {
-  id: 'email-1', subject: 'Hello there', sent_at: '2024-01-10T09:00:00Z',
-  created_at: '2024-01-10T09:00:00Z', person_ids: [1], organization_ids: [],
+  id: 1, subject: 'Hello there', sentAt: '2024-01-10T09:00:00Z',
+  createdAt: '2024-01-10T09:00:00Z',
 };
-const MOCK_EMAIL_NO_SUBJECT: AffinityEmailV2 = { ...MOCK_EMAIL, id: 'email-2', subject: null };
+const MOCK_EMAIL_NO_SUBJECT: AffinityEmailV2 = { ...MOCK_EMAIL, id: 2, subject: null };
 
 const MOCK_CALL: AffinityCallV2 = {
-  id: 'call-1', start_time: '2024-01-11T14:00:00Z',
-  created_at: '2024-01-11T14:00:00Z', person_ids: [1], organization_ids: [],
+  id: 1, startTime: '2024-01-11T14:00:00Z',
+  createdAt: '2024-01-11T14:00:00Z',
 };
 
 const MOCK_MEETING: AffinityMeetingV2 = {
-  id: 'meeting-1', title: 'Intro call', start_time: '2024-01-12T10:00:00Z',
-  end_time: '2024-01-12T11:00:00Z', created_at: '2024-01-12T10:00:00Z',
-  person_ids: [1], organization_ids: [],
+  id: 1, title: 'Intro call', startTime: '2024-01-12T10:00:00Z',
+  endTime: '2024-01-12T11:00:00Z', createdAt: '2024-01-12T10:00:00Z',
 };
-const MOCK_MEETING_NO_TITLE: AffinityMeetingV2 = { ...MOCK_MEETING, id: 'meeting-2', title: null };
+const MOCK_MEETING_NO_TITLE: AffinityMeetingV2 = { ...MOCK_MEETING, id: 2, title: null };
 
 const MOCK_CHAT: AffinityChatMessageV2 = {
-  id: 'chat-1', content: 'Hey, checking in!', sent_at: '2024-01-13T08:00:00Z',
-  created_at: '2024-01-13T08:00:00Z', person_ids: [1], organization_ids: [],
+  id: 1, content: 'Hey, checking in!', sentAt: '2024-01-13T08:00:00Z',
+  createdAt: '2024-01-13T08:00:00Z',
 };
-const MOCK_CHAT_NO_CONTENT: AffinityChatMessageV2 = { ...MOCK_CHAT, id: 'chat-2', content: null };
+const MOCK_CHAT_NO_CONTENT: AffinityChatMessageV2 = { ...MOCK_CHAT, id: 2, content: null };
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -45,7 +44,7 @@ describe('get_emails tool', () => {
     registerInteractionsV2Tools(server, mockApi);
     const result = await callTool('get_emails', { limit: 25 });
     const text = result.content[0].text;
-    expect(text).toContain('[email:email-1]');
+    expect(text).toContain('[email:1]');
     expect(text).toContain('Hello there');
     expect(text).toContain('1 email');
   });
@@ -82,7 +81,7 @@ describe('get_calls tool', () => {
     registerInteractionsV2Tools(server, mockApi);
     const result = await callTool('get_calls', { limit: 25 });
     const text = result.content[0].text;
-    expect(text).toContain('[call:call-1]');
+    expect(text).toContain('[call:1]');
     expect(text).toContain('1 call');
   });
 
@@ -110,7 +109,7 @@ describe('get_meetings tool', () => {
     registerInteractionsV2Tools(server, mockApi);
     const result = await callTool('get_meetings', { limit: 25 });
     const text = result.content[0].text;
-    expect(text).toContain('[meeting:meeting-1]');
+    expect(text).toContain('[meeting:1]');
     expect(text).toContain('Intro call');
   });
 
@@ -146,7 +145,7 @@ describe('get_chat_messages tool', () => {
     registerInteractionsV2Tools(server, mockApi);
     const result = await callTool('get_chat_messages', { limit: 25 });
     const text = result.content[0].text;
-    expect(text).toContain('[chat:chat-1]');
+    expect(text).toContain('[chat:1]');
     expect(text).toContain('Hey, checking in!');
   });
 

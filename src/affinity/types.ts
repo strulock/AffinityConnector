@@ -137,42 +137,37 @@ export interface AffinityRelationshipStrength {
   last_activity_date: string | null;
 }
 
-// v2 interaction types — granular per-channel endpoints replacing v1 /interactions
+// v2 interaction types — camelCase fields matching the actual Affinity v2 API schema
 
 export interface AffinityEmailV2 {
-  id: string;
+  id: number;
   subject: string | null;
-  sent_at: string;
-  created_at: string;
-  person_ids: number[];
-  organization_ids: number[];
+  sentAt: string;
+  createdAt: string;
+  direction?: 'sent' | 'received';
 }
 
 export interface AffinityCallV2 {
-  id: string;
-  start_time: string;
-  created_at: string;
-  person_ids: number[];
-  organization_ids: number[];
+  id: number;
+  title?: string | null;
+  startTime: string;
+  endTime?: string | null;
+  createdAt: string;
 }
 
 export interface AffinityMeetingV2 {
-  id: string;
+  id: number;
   title: string | null;
-  start_time: string;
-  end_time: string | null;
-  created_at: string;
-  person_ids: number[];
-  organization_ids: number[];
+  startTime: string;
+  endTime: string | null;
+  createdAt: string;
 }
 
 export interface AffinityChatMessageV2 {
-  id: string;
+  id: number;
   content: string | null;
-  sent_at: string;
-  created_at: string;
-  person_ids: number[];
-  organization_ids: number[];
+  sentAt: string;
+  createdAt: string;
 }
 
 export interface AffinityNoteReply {

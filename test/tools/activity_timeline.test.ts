@@ -6,14 +6,14 @@ import { makeMockServer } from '../helpers/mock-server.js';
 import type { AffinityEmailV2, AffinityMeetingV2, AffinityNote } from '../../src/affinity/types.js';
 
 const MOCK_EMAIL: AffinityEmailV2 = {
-  id: 'email-1', subject: 'Intro call follow-up', sent_at: '2024-03-15T09:00:00Z',
-  created_at: '2024-03-15T09:00:00Z', person_ids: [1], organization_ids: [],
+  id: 1, subject: 'Intro call follow-up', sentAt: '2024-03-15T09:00:00Z',
+  createdAt: '2024-03-15T09:00:00Z',
 };
 
 const MOCK_MEETING: AffinityMeetingV2 = {
-  id: 'meeting-1', title: 'Q1 Pipeline Review',
-  start_time: '2024-03-10T10:00:00Z', end_time: '2024-03-10T10:45:00Z',
-  created_at: '2024-03-10T10:00:00Z', person_ids: [1], organization_ids: [],
+  id: 1, title: 'Q1 Pipeline Review',
+  startTime: '2024-03-10T10:00:00Z', endTime: '2024-03-10T10:45:00Z',
+  createdAt: '2024-03-10T10:00:00Z',
 };
 
 const MOCK_NOTE: AffinityNote = {
@@ -79,9 +79,9 @@ describe('get_activity_timeline tool', () => {
   it('caps results at the limit', async () => {
     const emails: AffinityEmailV2[] = Array.from({ length: 5 }, (_, i) => ({
       ...MOCK_EMAIL,
-      id: `email-${i}`,
-      sent_at: `2024-0${i + 1}-01T00:00:00Z`,
-      created_at: `2024-0${i + 1}-01T00:00:00Z`,
+      id: i + 1,
+      sentAt: `2024-0${i + 1}-01T00:00:00Z`,
+      createdAt: `2024-0${i + 1}-01T00:00:00Z`,
     }));
     const { callTool } = setup(emails);
     const result = await callTool('get_activity_timeline', { person_id: 1, limit: 3 });
@@ -110,8 +110,8 @@ describe('get_activity_timeline tool', () => {
     expect(result.content[0].text).toContain('organization 10');
   });
 
-  it('formats meeting without end_time correctly (no duration)', async () => {
-    const noEnd: AffinityMeetingV2 = { ...MOCK_MEETING, end_time: null };
+  it('formats meeting without endTime correctly (no duration)', async () => {
+    const noEnd: AffinityMeetingV2 = { ...MOCK_MEETING, endTime: null };
     const { callTool } = setup([], [noEnd]);
     const result = await callTool('get_activity_timeline', { person_id: 1 });
     expect(result.content[0].text).toContain('Q1 Pipeline Review');
@@ -133,15 +133,15 @@ describe('get_activity_timeline tool', () => {
   });
 
   it('omits duration when meeting start and end time are equal', async () => {
-    const zeroDuration: AffinityMeetingV2 = { ...MOCK_MEETING, end_time: MOCK_MEETING.start_time };
+    const zeroDuration: AffinityMeetingV2 = { ...MOCK_MEETING, endTime: MOCK_MEETING.startTime };
     const { callTool } = setup([], [zeroDuration]);
     const result = await callTool('get_activity_timeline', { person_id: 1 });
     expect(result.content[0].text).not.toContain('min)');
   });
 
   it('preserves order of items with equal dates (sort returns 0)', async () => {
-    const email1: AffinityEmailV2 = { ...MOCK_EMAIL, id: 'e1', sent_at: '2024-03-15T09:00:00Z' };
-    const email2: AffinityEmailV2 = { ...MOCK_EMAIL, id: 'e2', sent_at: '2024-03-15T09:00:00Z', subject: 'Same time email' };
+    const email1: AffinityEmailV2 = { ...MOCK_EMAIL, id: 2, sentAt: '2024-03-15T09:00:00Z' };
+    const email2: AffinityEmailV2 = { ...MOCK_EMAIL, id: 3, sentAt: '2024-03-15T09:00:00Z', subject: 'Same time email' };
     const { callTool } = setup([email1, email2]);
     const result = await callTool('get_activity_timeline', { person_id: 1 });
     expect(result.content[0].text).toContain('Same time email');
