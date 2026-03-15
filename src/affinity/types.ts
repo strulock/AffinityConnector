@@ -12,7 +12,7 @@ export interface AffinityPerson {
   opportunity_ids: number[];
   list_entries: AffinityListEntryRef[];
   interaction_dates: AffinityInteractionDates;
-  created_at: string;
+  created_at?: string; // v1 API may not include this field
 }
 
 export interface AffinityPhone {
@@ -44,7 +44,7 @@ export interface AffinityOrganization {
   opportunity_ids: number[];
   list_entries: AffinityListEntryRef[];
   interaction_dates: AffinityInteractionDates;
-  created_at: string;
+  created_at?: string; // v1 API may not include this field
 }
 
 export interface AffinityList {
@@ -85,7 +85,7 @@ export interface AffinityOpportunity {
   person_ids: number[];
   organization_ids: number[];
   list_entries: AffinityListEntryRef[];
-  created_at: string;
+  created_at?: string; // v1 API may not include this or may use non-ISO format
 }
 
 export interface AffinityListEntry {
@@ -209,7 +209,12 @@ export interface AffinityFieldValueChange {
   entity_type: number | null; // 0 = person, 1 = organization, 8 = opportunity
   list_entry_id: number | null;
   value: unknown;        // the new value after this change
-  changed_by_id: number;
+  changer: {             // v1 returns a changer object, not just an ID
+    id: number;
+    first_name: string;
+    last_name: string;
+    primary_email: string | null;
+  } | null;
   changed_at: string;
 }
 

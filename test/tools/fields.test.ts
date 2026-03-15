@@ -54,7 +54,7 @@ const MOCK_CHANGE: AffinityFieldValueChange = {
   entity_type: 1,
   list_entry_id: 50,
   value: 'Series A',
-  changed_by_id: 99,
+  changer: { id: 99, first_name: 'Alice', last_name: 'Smith', primary_email: 'alice@example.com' },
   changed_at: '2024-01-15T00:00:00Z',
 };
 
@@ -186,7 +186,7 @@ describe('get_field_value_changes tool', () => {
     const text = result.content[0].text;
     expect(text).toContain('Series A');
     expect(text).toContain('list entry 50');
-    expect(text).toContain('user 99');
+    expect(text).toContain('Alice Smith');
     expect(text).toContain('1 change');
   });
 

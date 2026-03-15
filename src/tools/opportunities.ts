@@ -58,7 +58,7 @@ export function registerOpportunityTools(server: McpServer, api: OpportunitiesAp
         `People: ${opp.person_ids.length ? opp.person_ids.join(', ') : 'none'}`,
         `Organizations: ${opp.organization_ids.length ? opp.organization_ids.join(', ') : 'none'}`,
         `Lists: ${listMemberships}`,
-        `Created: ${new Date(opp.created_at).toLocaleDateString()}`,
+        `Created: ${opp.created_at ? new Date(opp.created_at).toLocaleDateString() : 'N/A'}`,
       ];
       return { content: [{ type: 'text', text: lines.join('\n') }] };
       } catch (e) { return toolError(e); }
