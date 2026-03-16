@@ -3,20 +3,24 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { RemindersApi } from '../affinity/reminders.js';
+import { UtilityApi } from '../affinity/utility.js';
 import { toolError } from './_error.js';
 import type { AffinityReminder } from '../affinity/types.js';
 
 function formatReminder(r: AffinityReminder): string {
   const status = r.completed_at ? `completed ${r.completed_at}` : `due ${r.due_date}`;
-  const associations: string[] = [];
-  if (r.person_ids.length) associations.push(`people: ${r.person_ids.join(', ')}`);
-  if (r.organization_ids.length) associations.push(`orgs: ${r.organization_ids.join(', ')}`);
-  if (r.opportunity_ids.length) associations.push(`opps: ${r.opportunity_ids.join(', ')}`);
-  const assocStr = associations.length ? ` [${associations.join('; ')}]` : '';
-  return `[reminder:${r.id}] ${status} — ${r.content}${assocStr}`;
+  const assoc = r.person
+    ? `person: ${[r.person.first_name, r.person.last_name].filter(Boolean).join(' ') || r.person.id}`
+    : r.organization
+    ? `org: ${r.organization.name ?? r.organization.id}`
+    : r.opportunity
+    ? `opp: ${r.opportunity.name ?? r.opportunity.id}`
+    : '';
+  const assocStr = assoc ? ` [${assoc}]` : '';
+  return `[reminder:${r.id}] ${status} — ${r.content ?? '(no content)'}${assocStr}`;
 }
 
-export function registerReminderTools(server: McpServer, api: RemindersApi): void {
+export function registerReminderTools(server: McpServer, api: RemindersApi, utilityApi: UtilityApi): void {
   server.tool(
     'get_reminders',
     'List Affinity reminders. Optionally filter by person_id or organization_id to see follow-ups for a specific contact or company.',
@@ -41,33 +45,32 @@ export function registerReminderTools(server: McpServer, api: RemindersApi): voi
 
   server.tool(
     'create_reminder',
-    'Create a follow-up reminder in Affinity. Provide content, a due date (YYYY-MM-DD), and at least one associated person, org, or opportunity.',
+    'Create a follow-up reminder in Affinity. Provide content, a due date (YYYY-MM-DD), and exactly one associated entity (person_id, organization_id, or opportunity_id).',
     {
       content: z.string().describe('Reminder text / follow-up note'),
       due_date: z.string()
         .regex(/^\d{4}-\d{2}-\d{2}$/, 'due_date must be in YYYY-MM-DD format')
         .describe('Due date in YYYY-MM-DD format'),
-      person_ids: z.array(z.coerce.number().int()).optional().describe('Person IDs to associate with this reminder'),
-      organization_ids: z.array(z.coerce.number().int()).optional().describe('Organization IDs to associate'),
-      opportunity_ids: z.array(z.coerce.number().int()).optional().describe('Opportunity IDs to associate'),
+      person_id: z.coerce.number().int().min(1).optional().describe('Person ID to associate (external contact, not yourself)'),
+      organization_id: z.coerce.number().int().min(1).optional().describe('Organization ID to associate'),
+      opportunity_id: z.coerce.number().int().min(1).optional().describe('Opportunity ID to associate'),
     },
-    async ({ content, due_date, person_ids, organization_ids, opportunity_ids }) => {
-      const hasAssociation =
-        (person_ids && person_ids.length > 0) ||
-        (organization_ids && organization_ids.length > 0) ||
-        (opportunity_ids && opportunity_ids.length > 0);
-
-      if (!hasAssociation) {
+    async ({ content, due_date, person_id, organization_id, opportunity_id }) => {
+      const assocCount = [person_id, organization_id, opportunity_id].filter(v => v != null).length;
+      if (assocCount !== 1) {
         return {
           content: [{
             type: 'text',
-            text: 'At least one of person_ids, organization_ids, or opportunity_ids must be provided.',
+            text: 'Provide exactly one of person_id, organization_id, or opportunity_id.',
           }],
         };
       }
 
       try {
-        const reminder = await api.createReminder({ content, due_date, person_ids, organization_ids, opportunity_ids });
+        const { id: owner_id } = await utilityApi.getCurrentUser();
+        const reminder = await api.createReminder({
+          content, due_date, owner_id, person_id, organization_id, opportunity_id,
+        });
         return {
           content: [{ type: 'text', text: `Created reminder [id:${reminder.id}] due ${reminder.due_date} — "${reminder.content}".` }],
         };

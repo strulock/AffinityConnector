@@ -9,7 +9,7 @@ export class RemindersApi {
 
   /**
    * Fetch reminders, optionally filtered by person, org, or opportunity.
-   * v1 returns a plain array.
+   * v1 returns { reminders: [...] } (wrapped).
    */
   async getReminders(params: {
     person_id?: number;
@@ -20,38 +20,34 @@ export class RemindersApi {
     const cached = await this.client.cache.get<AffinityReminder[]>(cacheKey);
     if (cached) return cached;
 
-    const raw = await this.client.get<AffinityReminder[]>('/reminders', params);
-    const reminders = Array.isArray(raw) ? raw : [];
+    const raw = await this.client.get<AffinityReminder[] | { reminders: AffinityReminder[] } | null>('/reminders', params);
+    const reminders = Array.isArray(raw) ? raw : (raw && typeof raw === 'object' && 'reminders' in raw) ? raw.reminders ?? [] : [];
     await this.client.cache.set(cacheKey, reminders, CACHE_TTL.reminders);
     return reminders;
   }
 
   /**
    * Create a reminder (v1 POST /reminders).
-   * At least one of person_ids, organization_ids, or opportunity_ids must be non-empty.
+   * Requires: content, due_date, type, owner_id, and exactly one of person_id/organization_id/opportunity_id.
    */
   async createReminder(params: {
     content: string;
     due_date: string;
-    person_ids?: number[];
-    organization_ids?: number[];
-    opportunity_ids?: number[];
+    owner_id: number;
+    person_id?: number;
+    organization_id?: number;
+    opportunity_id?: number;
   }): Promise<AffinityReminder> {
-    // Only include association arrays if non-empty — the v1 API rejects empty arrays
-    const body: {
-      content: string;
-      due_date: string;
-      person_ids?: number[];
-      organization_ids?: number[];
-      opportunity_ids?: number[];
-    } = {
+    const body: Record<string, unknown> = {
       content: params.content,
-      // v1 API expects ISO 8601 datetime; append time if only date provided
       due_date: params.due_date.includes('T') ? params.due_date : `${params.due_date}T00:00:00Z`,
-      ...(params.person_ids?.length ? { person_ids: params.person_ids } : {}),
-      ...(params.organization_ids?.length ? { organization_ids: params.organization_ids } : {}),
-      ...(params.opportunity_ids?.length ? { opportunity_ids: params.opportunity_ids } : {}),
+      type: 0, // one-time reminder
+      owner_id: params.owner_id,
     };
+    // API requires exactly one singular association ID
+    if (params.person_id) body.person_id = params.person_id;
+    if (params.organization_id) body.organization_id = params.organization_id;
+    if (params.opportunity_id) body.opportunity_id = params.opportunity_id;
     return this.client.post<AffinityReminder>('/reminders', body);
   }
 

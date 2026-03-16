@@ -64,7 +64,7 @@ export function createServer(apiKey: string, options?: AffinityClientOptions): M
   registerIntelligenceTools(server, intelligenceApi, peopleApi, orgsApi, notesApi, interactionsV2Api, utilityApi);
   registerFieldTools(server, fieldsApi);
   registerOpportunityTools(server, opportunitiesApi);
-  registerReminderTools(server, remindersApi);
+  registerReminderTools(server, remindersApi, utilityApi);
   registerInteractionsV2Tools(server, interactionsV2Api);
   registerSemanticSearchTools(server, semanticSearchApi);
   registerTranscriptTools(server, transcriptsApi);
