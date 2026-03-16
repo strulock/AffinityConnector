@@ -174,14 +174,24 @@ export interface AffinityNoteReply {
   created_at: string;
 }
 
+export interface AffinityReminderEntity {
+  id: number;
+  name?: string;
+  first_name?: string;
+  last_name?: string;
+}
+
 export interface AffinityReminder {
   id: number;
-  content: string;
+  type: number;          // 0 = one-time, 1 = recurring
+  content: string | null;
   due_date: string;
-  person_ids: number[];
-  organization_ids: number[];
-  opportunity_ids: number[];
-  creator_id: number;
+  status: number;        // 0 = completed, 1 = active, 2 = overdue
+  person: AffinityReminderEntity | null;
+  organization: AffinityReminderEntity | null;
+  opportunity: AffinityReminderEntity | null;
+  owner: AffinityReminderEntity | null;
+  creator: AffinityReminderEntity | null;
   completed_at: string | null;
   created_at: string;
 }
