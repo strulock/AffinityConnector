@@ -103,9 +103,9 @@ describe('POST /webhook route', () => {
     });
   }
 
-  it('returns 401 when no webhook secret is configured on the Worker', async () => {
+  it('accepts POST when no webhook secret is configured on the Worker', async () => {
     const res = await worker.fetch(makeWebhookRequest('any-secret'), makeWebhookEnv(undefined), {} as never);
-    expect(res.status).toBe(401);
+    expect(res.status).toBe(200);
   });
 
   it('returns 401 when the header secret does not match', async () => {

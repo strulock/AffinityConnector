@@ -98,9 +98,14 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
     return new Response("Payload Too Large", { status: 413 });
   }
 
-  const secret = request.headers.get("X-Affinity-Webhook-Secret");
-  if (!env.AFFINITY_WEBHOOK_SECRET || !secret || !(await timingSafeEqual(secret, env.AFFINITY_WEBHOOK_SECRET))) {
-    return new Response("Unauthorized", { status: 401 });
+  // Validate webhook secret if configured. The Affinity v1 API does not return a
+  // shared secret on webhook creation, so this check is opt-in: set AFFINITY_WEBHOOK_SECRET
+  // via `wrangler secret put` and configure the same value in Affinity if supported.
+  if (env.AFFINITY_WEBHOOK_SECRET) {
+    const secret = request.headers.get("X-Affinity-Webhook-Secret");
+    if (!secret || !(await timingSafeEqual(secret, env.AFFINITY_WEBHOOK_SECRET))) {
+      return new Response("Unauthorized", { status: 401 });
+    }
   }
 
   let payload: AffinityWebhookEvent;
