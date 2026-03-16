@@ -113,18 +113,41 @@ export class ListsApi {
   }
 
   /**
-   * Fetch all field values for a given field across an entire list (v1).
-   * Returns one value per list entry that has the field set.
-   * Efficient for aggregation — single request instead of per-entry fetches.
+   * Fetch field values for a specific field across all entries in a list.
+   * The v1 /field-values endpoint requires a per-entity ID (not list_id),
+   * so we first fetch list entries then query per entry in parallel batches.
+   * Capped at 500 entries to avoid excessive API calls.
    */
   async getFieldValuesByList(listId: number, fieldId: number): Promise<AffinityFieldValue[]> {
-    // Cap at 100 — the v1 field-values endpoint rejects page_size > 100 with a 422.
-    const values = await this.client.get<AffinityFieldValue[]>('/field-values', {
-      list_id: listId,
-      field_id: fieldId,
-      page_size: 100,
-    });
-    return Array.isArray(values) ? values : [];
+    // Paginate through list entries (up to 500)
+    const MAX_ENTRIES = 500;
+    const allEntryIds: number[] = [];
+    let pageToken: string | undefined;
+    while (allEntryIds.length < MAX_ENTRIES) {
+      const { entries, nextPageToken } = await this.getListEntries(listId, 100, pageToken);
+      for (const e of entries) allEntryIds.push(e.id);
+      if (!nextPageToken || entries.length === 0) break;
+      pageToken = nextPageToken;
+    }
+    if (allEntryIds.length === 0) return [];
+
+    // Fetch field values per entry in parallel batches of 10
+    const BATCH_SIZE = 10;
+    const allValues: AffinityFieldValue[] = [];
+    for (let i = 0; i < allEntryIds.length; i += BATCH_SIZE) {
+      const batch = allEntryIds.slice(i, i + BATCH_SIZE);
+      const results = await Promise.all(
+        batch.map(async (entryId) => {
+          const raw = await this.client.get<AffinityFieldValue[]>('/field-values', {
+            list_entry_id: entryId,
+            field_id: fieldId,
+          });
+          return Array.isArray(raw) ? raw : [];
+        }),
+      );
+      for (const values of results) allValues.push(...values);
+    }
+    return allValues;
   }
 
   /** Remove a list entry (v1 DELETE /lists/{id}/list-entries/{entry_id}). */

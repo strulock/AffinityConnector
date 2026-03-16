@@ -180,23 +180,34 @@ describe('ListsApi.setFieldValue', () => {
 });
 
 describe('ListsApi.getFieldValuesByList', () => {
-  it('GETs /field-values with list_id and field_id params', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify([MOCK_FIELD_VALUE]), { status: 200 })
-    );
+  it('fetches list entries then queries field values per entry', async () => {
+    let callNum = 0;
+    const fetchMock = vi.fn().mockImplementation(() => {
+      callNum++;
+      if (callNum === 1) {
+        // First call: getListEntries
+        return Promise.resolve(new Response(JSON.stringify({
+          list_entries: [{ id: 100, list_id: 1, entity_id: 10, entity_type: 1, created_at: '', entity: {} }],
+          next_page_token: null,
+        }), { status: 200 }));
+      }
+      // Second call: getFieldValues for entry 100
+      return Promise.resolve(new Response(JSON.stringify([MOCK_FIELD_VALUE]), { status: 200 }));
+    });
     vi.stubGlobal('fetch', fetchMock);
     const api = new ListsApi(new AffinityClient('key'));
     const result = await api.getFieldValuesByList(1, 5);
     expect(result).toEqual([MOCK_FIELD_VALUE]);
-    const [url] = fetchMock.mock.calls[0] as [string];
-    expect(url).toContain('/field-values');
-    expect(url).toContain('list_id=1');
-    expect(url).toContain('field_id=5');
+    // Should have called list-entries first, then field-values with list_entry_id
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const fieldValuesUrl = fetchMock.mock.calls[1][0] as string;
+    expect(fieldValuesUrl).toContain('list_entry_id=100');
+    expect(fieldValuesUrl).toContain('field_id=5');
   });
 
-  it('returns empty array when API returns a non-array', async () => {
+  it('returns empty array when list has no entries', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(null), { status: 200 })
+      new Response(JSON.stringify({ list_entries: [], next_page_token: null }), { status: 200 })
     ));
     const api = new ListsApi(new AffinityClient('key'));
     expect(await api.getFieldValuesByList(1, 5)).toEqual([]);

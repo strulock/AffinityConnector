@@ -294,8 +294,8 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
       const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
       const fieldName = values[0]?.field?.name ?? `Field ${field_id}`;
       const lines = sorted.map(([label, count]) => `  ${label}: ${count}`);
-      const truncationNote = values.length >= 100
-        ? '\n\n⚠️ Result capped at 100 entries — this list may have more. Summary may be incomplete.'
+      const truncationNote = values.length >= 500
+        ? '\n\n⚠️ Result capped at 500 entries — this list may have more. Summary may be incomplete.'
         : '';
       return {
         content: [{
