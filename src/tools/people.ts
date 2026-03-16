@@ -25,6 +25,7 @@ export function registerPeopleTools(server: McpServer, api: PeopleApi): void {
       limit: z.coerce.number().int().min(1).max(100).default(20).describe('Max results to return'),
     },
     async ({ query, limit }) => {
+      try {
       const people = await api.search(query, limit);
       if (people.length === 0) {
         return { content: [{ type: 'text', text: `No people found matching "${query}".` }] };
@@ -38,6 +39,7 @@ export function registerPeopleTools(server: McpServer, api: PeopleApi): void {
           },
         ],
       };
+      } catch (e) { return toolError(e); }
     }
   );
 

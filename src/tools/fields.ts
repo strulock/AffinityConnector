@@ -6,6 +6,7 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { FieldsApi } from '../affinity/fields.js';
 import { displayValue } from './_format.js';
+import { toolError } from './_error.js';
 import type { AffinityField, AffinityFieldValueChange } from '../affinity/types.js';
 
 // Human-readable labels for AffinityField.value_type numeric codes
@@ -55,13 +56,14 @@ export function registerFieldTools(server: McpServer, api: FieldsApi): void {
         .default('all')
         .describe('Which fields to return: "all" = entire workspace, "person" = global person fields, "organization" = global org fields, "list" = fields on a specific list (requires list_id)'),
       list_id: z
-        .number()
+        .coerce.number()
         .int()
         .min(1)
         .optional()
         .describe('Required when scope is "list". List ID from get_lists.'),
     },
     async ({ scope, list_id }) => {
+      try {
       if (scope === 'list' && !list_id) {
         return {
           content: [{ type: 'text', text: 'list_id is required when scope is "list".' }],
@@ -100,6 +102,7 @@ export function registerFieldTools(server: McpServer, api: FieldsApi): void {
           },
         ],
       };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -109,19 +112,20 @@ export function registerFieldTools(server: McpServer, api: FieldsApi): void {
     {
       field_id: z.coerce.number().int().min(1).describe('Field ID (from get_field_definitions)'),
       entity_id: z
-        .number()
+        .coerce.number()
         .int()
         .min(1)
         .optional()
         .describe('Filter changes to a specific person or organization by their ID'),
       list_entry_id: z
-        .number()
+        .coerce.number()
         .int()
         .min(1)
         .optional()
         .describe('Filter changes to a specific list entry by its ID'),
     },
     async ({ field_id, entity_id, list_entry_id }) => {
+      try {
       const changes = await api.getFieldValueChanges({ field_id, entity_id, list_entry_id });
       if (changes.length === 0) {
         return {
@@ -137,6 +141,7 @@ export function registerFieldTools(server: McpServer, api: FieldsApi): void {
           },
         ],
       };
+      } catch (e) { return toolError(e); }
     }
   );
 }

@@ -1,16 +1,8 @@
 // Affinity v2 transcript endpoints (BETA): /transcripts, /transcripts/{id}/fragments
 
 import { AffinityClient } from './client.js';
+import { extractCursor } from './pagination.js';
 import type { AffinityTranscript, AffinityTranscriptFragment, AffinityCursorPaginatedResponse } from './types.js';
-
-function cursorFromNextUrl(nextUrl?: string | null): string | undefined {
-  if (!nextUrl) return undefined;
-  try {
-    return new URL(nextUrl).searchParams.get('cursor') ?? undefined;
-  } catch {
-    return undefined;
-  }
-}
 
 export class TranscriptsApi {
   constructor(private client: AffinityClient) {}
@@ -31,7 +23,7 @@ export class TranscriptsApi {
     );
     return {
       transcripts: result.data ?? [],
-      nextCursor: cursorFromNextUrl(result.pagination?.nextUrl),
+      nextCursor: extractCursor(result.pagination?.nextUrl),
     };
   }
 
@@ -59,7 +51,7 @@ export class TranscriptsApi {
     );
     return {
       fragments: result.data ?? [],
-      nextCursor: cursorFromNextUrl(result.pagination?.nextUrl),
+      nextCursor: extractCursor(result.pagination?.nextUrl),
     };
   }
 }

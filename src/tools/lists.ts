@@ -56,6 +56,7 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
     'List all Affinity lists (pipelines, contact lists, etc.) available in your workspace.',
     {},
     async () => {
+      try {
       const lists = await api.getLists();
       if (lists.length === 0) {
         return { content: [{ type: 'text', text: 'No lists found in your Affinity workspace.' }] };
@@ -64,6 +65,7 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
       return {
         content: [{ type: 'text', text: `Found ${lists.length} list(s):\n\n${lines.join('\n')}` }],
       };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -127,16 +129,16 @@ export function registerListTools(server: McpServer, api: ListsApi): void {
         .union([z.string(), z.coerce.number(), z.boolean(), z.null()])
         .describe('New value for the field. Use a string for text/date/dropdown, number for numeric fields, null to clear.'),
       field_value_id: z
-        .number().int().min(1).optional()
+        .coerce.number().int().min(1).optional()
         .describe('Existing field value ID to update (from get_field_values). If omitted, a new value is created.'),
       list_entry_id: z
-        .number().int().min(1).optional()
+        .coerce.number().int().min(1).optional()
         .describe('List entry ID — required when creating a new value.'),
       entity_id: z
-        .number().int().min(1).optional()
+        .coerce.number().int().min(1).optional()
         .describe('Entity ID of the person, org, or opportunity — required when creating a new value.'),
       entity_type: z
-        .number().int().optional()
+        .coerce.number().int().optional()
         .describe('Entity type — required when creating: 0 = person, 1 = organization, 8 = opportunity.'),
     },
     async ({ field_id, value, field_value_id, list_entry_id, entity_id, entity_type }) => {

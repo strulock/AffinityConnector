@@ -25,6 +25,7 @@ export function registerOpportunityTools(server: McpServer, api: OpportunitiesAp
       list_id: z.coerce.number().int().min(1).optional().describe('Scope results to a specific list ID (from get_lists).'),
     },
     async ({ term, list_id }) => {
+      try {
       const opps = await api.search(term, list_id);
       if (opps.length === 0) {
         const msg = term ? `No opportunities found matching "${term}".` : 'No opportunities found.';
@@ -34,6 +35,7 @@ export function registerOpportunityTools(server: McpServer, api: OpportunitiesAp
       return {
         content: [{ type: 'text', text: `${opps.length} opportunity/ies:\n\n${lines.join('\n')}` }],
       };
+      } catch (e) { return toolError(e); }
     }
   );
 
