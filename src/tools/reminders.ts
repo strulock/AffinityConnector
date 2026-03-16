@@ -45,7 +45,7 @@ export function registerReminderTools(server: McpServer, api: RemindersApi, util
 
   server.tool(
     'create_reminder',
-    'Create a follow-up reminder in Affinity. Provide content, a due date (YYYY-MM-DD), and exactly one associated entity (person_id, organization_id, or opportunity_id).',
+    'Create a follow-up reminder in Affinity. Provide content, a due date (YYYY-MM-DD), and exactly one associated entity (person_id, organization_id, or opportunity_id). Note: person_id must be an external contact — you cannot tag yourself (the authenticated user).',
     {
       content: z.string().describe('Reminder text / follow-up note'),
       due_date: z.string()
