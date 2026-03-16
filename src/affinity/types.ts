@@ -12,7 +12,6 @@ export interface AffinityPerson {
   opportunity_ids: number[];
   list_entries: AffinityListEntryRef[];
   interaction_dates: AffinityInteractionDates;
-  created_at?: string; // v1 API may not include this field
 }
 
 export interface AffinityPhone {
@@ -44,7 +43,6 @@ export interface AffinityOrganization {
   opportunity_ids: number[];
   list_entries: AffinityListEntryRef[];
   interaction_dates: AffinityInteractionDates;
-  created_at?: string; // v1 API may not include this field
 }
 
 export interface AffinityList {
@@ -54,7 +52,6 @@ export interface AffinityList {
   public: boolean;
   owner_id: number;
   list_size: number;
-  created_at: string;
 }
 
 /**
@@ -85,7 +82,6 @@ export interface AffinityOpportunity {
   person_ids: number[];
   organization_ids: number[];
   list_entries: AffinityListEntryRef[];
-  created_at?: string; // v1 API may not include this or may use non-ISO format
 }
 
 export interface AffinityListEntry {
