@@ -7,6 +7,7 @@ import {
   AffinityNotFoundError,
   AffinityPermissionError,
   AffinityRateLimitError,
+  AffinityValidationError,
   AffinityServerError,
   AffinityConflictError,
 } from '../affinity/client.js';
@@ -22,6 +23,9 @@ export function toolError(e: unknown): ToolResult {
   }
   if (e instanceof AffinityNotFoundError) {
     return { content: [{ type: 'text', text: `Not found: ${e.message}` }] };
+  }
+  if (e instanceof AffinityValidationError) {
+    return { content: [{ type: 'text', text: `Validation error: ${e.message}` }] };
   }
   if (e instanceof AffinityConflictError) {
     return { content: [{ type: 'text', text: `Conflict: ${e.message}` }] };
