@@ -136,8 +136,16 @@ export class AffinityClient {
     const status = response.status;
     let message: string;
     try {
-      const body = await response.json() as { message?: string; error?: string };
-      message = body.message ?? body.error ?? response.statusText;
+      const body = await response.json();
+      // Affinity returns errors as { message: "..." }, { error: "..." }, or ["error1", "error2"]
+      if (Array.isArray(body)) {
+        message = body.join('; ') || response.statusText;
+      } else if (body && typeof body === 'object') {
+        const obj = body as { message?: string; error?: string };
+        message = obj.message ?? obj.error ?? response.statusText;
+      } else {
+        message = response.statusText;
+      }
     } catch {
       message = response.statusText;
     }
