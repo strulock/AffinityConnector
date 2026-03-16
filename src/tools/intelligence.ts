@@ -9,6 +9,7 @@ import { OrganizationsApi } from '../affinity/organizations.js';
 import { NotesApi } from '../affinity/notes.js';
 import { InteractionsV2Api } from '../affinity/interactions_v2.js';
 import { AffinityNotFoundError } from '../affinity/client.js';
+import { toolError } from './_error.js';
 import { UtilityApi } from '../affinity/utility.js';
 import type { AffinityRelationshipStrength } from '../affinity/types.js';
 
@@ -35,11 +36,12 @@ export function registerIntelligenceTools(
     {
       entity_id: z.coerce.number().int().min(1).describe('Person or organization ID'),
       entity_type: z
-        .number()
+        .coerce.number()
         .int()
         .describe('Entity type: 0 = person, 1 = organization'),
     },
     async ({ entity_id, entity_type }) => {
+      try {
       if (entity_type === 1) {
         return {
           content: [{
@@ -65,6 +67,7 @@ export function registerIntelligenceTools(
           },
         ],
       };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -75,6 +78,7 @@ export function registerIntelligenceTools(
       person_id: z.coerce.number().int().min(1).describe('ID of the person you want an introduction to'),
     },
     async ({ person_id }) => {
+      try {
       // 1. Get target person to find their organizations
       const target = await peopleApi.getById(person_id).catch((e: unknown) => {
         if (e instanceof AffinityNotFoundError) return null;
@@ -170,6 +174,7 @@ export function registerIntelligenceTools(
         text += `\n\n(Note: ${skippedOrgs} organization(s) could not be fetched and were excluded from the intro path.)`;
       }
       return { content: [{ type: 'text', text }] };
+      } catch (e) { return toolError(e); }
     }
   );
 
@@ -178,12 +183,12 @@ export function registerIntelligenceTools(
     'Aggregate all available relationship data for a person or organization — profile, recent notes, recent interactions, and relationship strength — into a single briefing for analysis.',
     {
       person_id: z
-        .number()
+        .coerce.number()
         .int()
         .optional()
         .describe('Person ID to summarize (provide either person_id or organization_id)'),
       organization_id: z
-        .number()
+        .coerce.number()
         .int()
         .optional()
         .describe('Organization ID to summarize (provide either person_id or organization_id)'),

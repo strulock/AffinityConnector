@@ -115,6 +115,7 @@ export function registerWebhookTools(
       enrich: z.boolean().optional().describe('Fetch and append the current entity name for each event (max 5, default false)'),
     },
     async ({ event_type, entity_id, limit = 20, enrich = false }) => {
+      try {
       const recentIds = await cache.get<string[]>(WEBHOOK_RECENT_KEY) ?? [];
       if (recentIds.length === 0) {
         return { content: [{ type: 'text', text: 'No webhook events received yet.' }] };
@@ -184,6 +185,7 @@ export function registerWebhookTools(
       return {
         content: [{ type: 'text', text: `${limited.length} event(s):\n\n${lines.join('\n')}` }],
       };
+      } catch (e) { return toolError(e); }
     }
   );
 }

@@ -24,6 +24,7 @@ export function registerOrganizationTools(server: McpServer, api: OrganizationsA
       limit: z.coerce.number().int().min(1).max(100).default(20).describe('Max results to return'),
     },
     async ({ query, limit }) => {
+      try {
       const orgs = await api.search(query, limit);
       if (orgs.length === 0) {
         return {
@@ -39,6 +40,7 @@ export function registerOrganizationTools(server: McpServer, api: OrganizationsA
           },
         ],
       };
+      } catch (e) { return toolError(e); }
     }
   );
 

@@ -3,8 +3,10 @@
 // Re-throws anything unknown so the MCP layer can handle it.
 
 import {
+  AffinityAuthError,
   AffinityNotFoundError,
   AffinityPermissionError,
+  AffinityRateLimitError,
   AffinityServerError,
   AffinityConflictError,
 } from '../affinity/client.js';
@@ -12,6 +14,12 @@ import {
 type ToolResult = { content: [{ type: 'text'; text: string }] };
 
 export function toolError(e: unknown): ToolResult {
+  if (e instanceof AffinityAuthError) {
+    return { content: [{ type: 'text', text: `Authentication failed: ${e.message}` }] };
+  }
+  if (e instanceof AffinityRateLimitError) {
+    return { content: [{ type: 'text', text: `Rate limit exceeded: ${e.message}` }] };
+  }
   if (e instanceof AffinityNotFoundError) {
     return { content: [{ type: 'text', text: `Not found: ${e.message}` }] };
   }
