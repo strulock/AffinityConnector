@@ -54,9 +54,17 @@ export function registerReminderTools(server: McpServer, api: RemindersApi, util
       person_id: z.coerce.number().int().min(1).optional().describe('Person ID to associate (external contact, not yourself)'),
       organization_id: z.coerce.number().int().min(1).optional().describe('Organization ID to associate'),
       opportunity_id: z.coerce.number().int().min(1).optional().describe('Opportunity ID to associate'),
+      // Accept legacy array params for backwards compatibility
+      person_ids: z.array(z.coerce.number().int()).optional().describe('(Legacy) Person IDs — first element used'),
+      organization_ids: z.array(z.coerce.number().int()).optional().describe('(Legacy) Organization IDs — first element used'),
+      opportunity_ids: z.array(z.coerce.number().int()).optional().describe('(Legacy) Opportunity IDs — first element used'),
     },
-    async ({ content, due_date, person_id, organization_id, opportunity_id }) => {
-      const assocCount = [person_id, organization_id, opportunity_id].filter(v => v != null).length;
+    async ({ content, due_date, person_id, organization_id, opportunity_id, person_ids, organization_ids, opportunity_ids }) => {
+      // Support both singular and legacy array params
+      const pid = person_id ?? person_ids?.[0];
+      const oid = organization_id ?? organization_ids?.[0];
+      const oppid = opportunity_id ?? opportunity_ids?.[0];
+      const assocCount = [pid, oid, oppid].filter(v => v != null).length;
       if (assocCount !== 1) {
         return {
           content: [{
@@ -69,7 +77,7 @@ export function registerReminderTools(server: McpServer, api: RemindersApi, util
       try {
         const { id: owner_id } = await utilityApi.getCurrentUser();
         const reminder = await api.createReminder({
-          content, due_date, owner_id, person_id, organization_id, opportunity_id,
+          content, due_date, owner_id, person_id: pid, organization_id: oid, opportunity_id: oppid,
         });
         return {
           content: [{ type: 'text', text: `Created reminder [id:${reminder.id}] due ${reminder.due_date} — "${reminder.content}".` }],

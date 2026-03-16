@@ -51,9 +51,12 @@ export function registerIntelligenceTools(
       const { id: internalId } = await utilityApi.getCurrentUser();
       const result = await api.getRelationshipStrength(entity_id, entity_type, internalId);
       const label = strengthLabel(result.strength);
-      const lastActivity = result.last_activity_date
-        ? new Date(result.last_activity_date).toLocaleDateString()
-        : 'unknown';
+      // v1 /relationships-strengths doesn't return a timestamp, so fetch from person profile
+      let lastActivity = 'unknown';
+      try {
+        const person = await peopleApi.getById(entity_id);
+        lastActivity = person.interaction_dates?.last_interaction_date ?? 'unknown';
+      } catch { /* person lookup failed — show unknown */ }
       return {
         content: [
           {
