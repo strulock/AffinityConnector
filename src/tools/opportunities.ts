@@ -68,19 +68,20 @@ export function registerOpportunityTools(server: McpServer, api: OpportunitiesAp
 
   server.tool(
     'create_opportunity',
-    'Create a new Affinity opportunity (deal). Optionally associate people and organizations at creation time. Use add_to_list to add to a pipeline list after creation.',
+    'Create a new Affinity opportunity (deal). Requires list_id to place the opportunity on a pipeline list. Optionally associate people and organizations at creation time.',
     {
       name: z.string().describe('Opportunity name'),
+      list_id: z.coerce.number().int().min(1).describe('Pipeline list ID to create the opportunity on (from get_lists). Required by the Affinity API.'),
       person_ids: z.array(z.coerce.number().int()).optional().describe('Person IDs to associate with this opportunity'),
       organization_ids: z.array(z.coerce.number().int()).optional().describe('Organization IDs to associate with this opportunity'),
     },
-    async ({ name, person_ids, organization_ids }) => {
+    async ({ name, list_id, person_ids, organization_ids }) => {
       try {
-        const opp = await api.create({ name, person_ids, organization_ids });
+        const opp = await api.create({ name, list_id, person_ids, organization_ids });
         return {
           content: [{
             type: 'text',
-            text: `Created opportunity [id:${opp.id}] "${opp.name}". Use add_to_list to add it to a pipeline.`,
+            text: `Created opportunity [id:${opp.id}] "${opp.name}" on list ${list_id}.`,
           }],
         };
       } catch (e) { return toolError(e); }
