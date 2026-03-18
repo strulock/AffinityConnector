@@ -124,23 +124,24 @@ describe('get_opportunity tool', () => {
 describe('create_opportunity tool', () => {
   it('returns confirmation with new opportunity ID', async () => {
     const { callTool, api } = setup();
-    const result = await callTool('create_opportunity', { name: 'Acme Deal' });
-    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'Acme Deal' }));
+    const result = await callTool('create_opportunity', { name: 'Acme Deal', list_id: 5 });
+    expect(api.create).toHaveBeenCalledWith(expect.objectContaining({ name: 'Acme Deal', list_id: 5 }));
     expect(result.content[0].text).toContain('id:1');
     expect(result.content[0].text).toContain('Acme Deal');
+    expect(result.content[0].text).toContain('list 5');
   });
 
   it('passes person_ids and organization_ids when provided', async () => {
     const { callTool, api } = setup();
-    await callTool('create_opportunity', { name: 'Deal', person_ids: [10], organization_ids: [20] });
+    await callTool('create_opportunity', { name: 'Deal', list_id: 5, person_ids: [10], organization_ids: [20] });
     expect(api.create).toHaveBeenCalledWith(
-      expect.objectContaining({ person_ids: [10], organization_ids: [20] })
+      expect.objectContaining({ list_id: 5, person_ids: [10], organization_ids: [20] })
     );
   });
 
   it('returns a Not found response when the API throws AffinityNotFoundError', async () => {
     const { callTool } = setup({ create: vi.fn().mockRejectedValue(new AffinityNotFoundError('person 999 not found')) });
-    const result = await callTool('create_opportunity', { name: 'Deal' });
+    const result = await callTool('create_opportunity', { name: 'Deal', list_id: 5 });
     expect(result.content[0].text).toContain('Not found:');
   });
 });
