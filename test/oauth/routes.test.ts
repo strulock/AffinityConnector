@@ -74,9 +74,56 @@ describe('handleRegister', () => {
   });
 });
 
+describe('handleRegister — invalid JSON', () => {
+  it('returns 400 for non-JSON body', async () => {
+    const env = makeEnv();
+    const req = new Request('https://affinity.example.com/oauth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: 'not json',
+    });
+    const res = await handleRegister(req, env);
+    expect(res.status).toBe(400);
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe('invalid_client_metadata');
+  });
+});
+
 // --- Authorize GET ---
 
 describe('handleAuthorizeGet', () => {
+  it('returns 400 for unsupported response_type', async () => {
+    const env = makeEnv();
+    const url = 'https://affinity.example.com/oauth/authorize?response_type=token&client_id=c&redirect_uri=https://example.com/cb&code_challenge=x&code_challenge_method=S256&state=s';
+    const req = new Request(url);
+    const res = await handleAuthorizeGet(req, env);
+    expect(res.status).toBe(400);
+    const html = await res.text();
+    expect(html).toContain('response_type');
+  });
+
+  it('returns 400 for non-S256 code_challenge_method', async () => {
+    const env = makeEnv();
+    const client = await registerClient(env.OAUTH_KV!, { redirect_uris: ['https://example.com/cb'] });
+    const url = `https://affinity.example.com/oauth/authorize?response_type=code&client_id=${client.client_id}&redirect_uri=https://example.com/cb&code_challenge=x&code_challenge_method=plain&state=s`;
+    const req = new Request(url);
+    const res = await handleAuthorizeGet(req, env);
+    expect(res.status).toBe(400);
+    const html = await res.text();
+    expect(html).toContain('S256');
+  });
+
+  it('returns 400 when redirect_uri does not match registered URI', async () => {
+    const env = makeEnv();
+    const client = await registerClient(env.OAUTH_KV!, { redirect_uris: ['https://example.com/cb'] });
+    const url = `https://affinity.example.com/oauth/authorize?response_type=code&client_id=${client.client_id}&redirect_uri=https://evil.com/cb&code_challenge=x&code_challenge_method=S256&state=s`;
+    const req = new Request(url);
+    const res = await handleAuthorizeGet(req, env);
+    expect(res.status).toBe(400);
+    const html = await res.text();
+    expect(html).toContain('not registered');
+  });
+
   it('renders the HTML form for valid params', async () => {
     const env = makeEnv();
     const client = await registerClient(env.OAUTH_KV!, { redirect_uris: ['https://example.com/cb'] });
@@ -170,6 +217,50 @@ describe('handleAuthorizePost', () => {
     expect(html).toContain('Invalid API key');
   });
 
+  it('re-renders form on Affinity server error (500)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('Server Error', { status: 500 })));
+
+    const form = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: 'https://example.com/cb',
+      state: 'xyz',
+      code_challenge: 'c',
+      code_challenge_method: 'S256',
+      scope: 'affinity',
+      api_key: 'some-key',
+    });
+    const req = new Request('https://affinity.example.com/oauth/authorize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString(),
+    });
+    const res = await handleAuthorizePost(req, env);
+    const html = await res.text();
+    expect(html).toContain('Affinity returned an error');
+  });
+
+  it('re-renders form when fetch to Affinity throws (network error)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network failure')));
+
+    const form = new URLSearchParams({
+      client_id: clientId,
+      redirect_uri: 'https://example.com/cb',
+      state: 'xyz',
+      code_challenge: 'c',
+      code_challenge_method: 'S256',
+      scope: 'affinity',
+      api_key: 'some-key',
+    });
+    const req = new Request('https://affinity.example.com/oauth/authorize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: form.toString(),
+    });
+    const res = await handleAuthorizePost(req, env);
+    const html = await res.text();
+    expect(html).toContain('Could not reach Affinity');
+  });
+
   it('re-renders form when API key is empty', async () => {
     const form = new URLSearchParams({
       client_id: clientId,
@@ -233,6 +324,32 @@ describe('handleToken', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: 'grant_type=authorization_code&code=bad-code&client_id=some-client&code_verifier=verifier',
+    });
+    const res = await handleToken(req, env);
+    expect(res.status).toBe(400);
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe('invalid_grant');
+  });
+
+  it('returns error for missing params on refresh_token', async () => {
+    const env = makeEnv();
+    const req = new Request('https://affinity.example.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=refresh_token',
+    });
+    const res = await handleToken(req, env);
+    expect(res.status).toBe(400);
+    const body = await res.json() as { error: string };
+    expect(body.error).toBe('invalid_request');
+  });
+
+  it('returns error for invalid refresh_token', async () => {
+    const env = makeEnv();
+    const req = new Request('https://affinity.example.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'grant_type=refresh_token&refresh_token=bad-token&client_id=some-client',
     });
     const res = await handleToken(req, env);
     expect(res.status).toBe(400);
@@ -313,5 +430,25 @@ describe('full OAuth flow', () => {
     const encKey = await importEncryptionKey(TEST_ENC_KEY);
     const apiKey = await resolveToken(env.OAUTH_KV!, encKey, tokens.access_token);
     expect(apiKey).toBe('my-real-affinity-key');
+
+    // 6. Refresh token exchange
+    const refreshReq = new Request('https://affinity.example.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'refresh_token',
+        refresh_token: tokens.refresh_token,
+        client_id,
+      }).toString(),
+    });
+    const refreshRes = await handleToken(refreshReq, env);
+    expect(refreshRes.status).toBe(200);
+    const newTokens = await refreshRes.json() as { access_token: string; refresh_token: string };
+    expect(newTokens.access_token).toBeTruthy();
+    expect(newTokens.access_token).not.toBe(tokens.access_token);
+
+    // 7. New token resolves to same API key
+    const newApiKey = await resolveToken(env.OAUTH_KV!, encKey, newTokens.access_token);
+    expect(newApiKey).toBe('my-real-affinity-key');
   });
 });

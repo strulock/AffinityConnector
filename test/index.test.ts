@@ -268,3 +268,75 @@ describe('POST /mcp — Cloudflare Access JWT validation', () => {
     expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://claude.ai');
   });
 });
+
+describe('POST /mcp — OAuth Bearer token handling', () => {
+  function makeOAuthEnv(overrides?: Record<string, unknown>): unknown {
+    return {
+      AFFINITY_CACHE: undefined,
+      OAUTH_KV: makeKVMock(),
+      OAUTH_ENCRYPTION_KEY: 'a'.repeat(64),
+      ...overrides,
+    };
+  }
+
+  it('returns 401 with WWW-Authenticate when OAuth enabled and no Bearer token and no fallback key', async () => {
+    const res = await worker.fetch(makeRequest('POST', '/mcp'), makeOAuthEnv(), {} as never);
+    expect(res.status).toBe(401);
+    const wwwAuth = res.headers.get('WWW-Authenticate');
+    expect(wwwAuth).toContain('resource_metadata=');
+    expect(wwwAuth).toContain('oauth-protected-resource');
+    expect(res.headers.get('Access-Control-Allow-Origin')).toBe('https://claude.ai');
+  });
+
+  it('returns 401 with WWW-Authenticate when Bearer token is invalid', async () => {
+    const req = new Request('https://affinity.trulock.com/mcp', {
+      method: 'POST',
+      headers: { Authorization: 'Bearer invalid-token-that-wont-resolve' },
+    });
+    const res = await worker.fetch(req, makeOAuthEnv(), {} as never);
+    expect(res.status).toBe(401);
+    expect(res.headers.get('WWW-Authenticate')).toContain('resource_metadata=');
+  });
+
+  it('falls back to AFFINITY_API_KEY when OAuth enabled but no Bearer token', async () => {
+    const env = makeOAuthEnv({ AFFINITY_API_KEY: 'fallback-key' });
+    const res = await worker.fetch(makeRequest('POST', '/mcp'), env, {} as never);
+    expect(res.status).toBe(200);
+  });
+
+  it('returns 500 when no OAuth and no API key configured', async () => {
+    const env = { AFFINITY_CACHE: undefined };
+    const res = await worker.fetch(makeRequest('POST', '/mcp'), env, {} as never);
+    expect(res.status).toBe(500);
+  });
+});
+
+describe('OAuth discovery with OAuth enabled', () => {
+  it('includes authorization_servers when OAuth is configured', async () => {
+    const env = {
+      AFFINITY_API_KEY: 'key',
+      AFFINITY_CACHE: undefined,
+      OAUTH_KV: makeKVMock(),
+      OAUTH_ENCRYPTION_KEY: 'a'.repeat(64),
+    };
+    const res = await worker.fetch(
+      makeRequest('GET', '/.well-known/oauth-protected-resource'),
+      env,
+      {} as never,
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json() as { resource: string; authorization_servers?: string[] };
+    expect(body.authorization_servers).toEqual(['https://affinity.trulock.com']);
+    expect(body.resource).toBe('https://affinity.trulock.com');
+  });
+
+  it('omits authorization_servers when OAuth is not configured', async () => {
+    const res = await worker.fetch(
+      makeRequest('GET', '/.well-known/oauth-protected-resource'),
+      makeEnv(),
+      {} as never,
+    );
+    const body = await res.json() as { resource: string; authorization_servers?: string[] };
+    expect(body.authorization_servers).toBeUndefined();
+  });
+});
