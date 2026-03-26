@@ -22,5 +22,14 @@ CLOUDFLARE_ACCESS_TEAM_DOMAIN = "trulock.cloudflareaccess.com"
 binding = "AFFINITY_CACHE"
 id = "1413d1000c9a4911acae52b3ce49aaa8"
 
-# Secrets (set via: wrangler secret put AFFINITY_API_KEY)
-# AFFINITY_API_KEY
+# OAuth 2.1 per-user authentication (optional).
+# Create the KV namespace: wrangler kv:namespace create OAUTH_KV
+# Then update the id below with the generated namespace ID.
+# [[kv_namespaces]]
+# binding = "OAUTH_KV"
+# id = "<generated-namespace-id>"
+
+# Secrets (set via: wrangler secret put <NAME>)
+# AFFINITY_API_KEY          — shared Affinity API key (optional when OAuth is enabled)
+# OAUTH_ENCRYPTION_KEY      — 256-bit hex AES key for encrypting user API keys at rest
+#                             Generate with: openssl rand -hex 32
