@@ -32,9 +32,11 @@ jobs:
       - name: Ensure OAUTH_KV namespace exists
         id: oauth_kv
         run: |
-          # List existing KV namespaces and look for one titled "affinity-connector-OAUTH_KV"
-          EXISTING_ID=$(npx wrangler kv namespace list 2>/dev/null \
-            | jq -r '.[] | select(.title == "affinity-connector-OAUTH_KV") | .id // empty' 2>/dev/null || true)
+          # List existing KV namespaces and look for OAUTH_KV (title may or may not have worker name prefix)
+          LIST_OUTPUT=$(npx wrangler kv namespace list 2>&1) || true
+          echo "KV namespace list output: $LIST_OUTPUT"
+          EXISTING_ID=$(echo "$LIST_OUTPUT" \
+            | jq -r '.[] | select(.title == "OAUTH_KV" or .title == "affinity-connector-OAUTH_KV") | .id // empty' 2>/dev/null || true)
 
           if [ -n "$EXISTING_ID" ]; then
             echo "OAUTH_KV namespace already exists: $EXISTING_ID"
