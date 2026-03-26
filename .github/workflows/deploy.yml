@@ -34,18 +34,19 @@ jobs:
         run: |
           # List existing KV namespaces and look for one titled "affinity-connector-OAUTH_KV"
           EXISTING_ID=$(npx wrangler kv:namespace list 2>/dev/null \
-            | jq -r '.[] | select(.title == "affinity-connector-OAUTH_KV") | .id' 2>/dev/null || echo "")
+            | jq -r '.[] | select(.title == "affinity-connector-OAUTH_KV") | .id // empty' 2>/dev/null || true)
 
           if [ -n "$EXISTING_ID" ]; then
             echo "OAUTH_KV namespace already exists: $EXISTING_ID"
             echo "namespace_id=$EXISTING_ID" >> "$GITHUB_OUTPUT"
           else
             echo "Creating OAUTH_KV namespace..."
-            CREATE_OUTPUT=$(npx wrangler kv:namespace create OAUTH_KV 2>&1)
+            CREATE_OUTPUT=$(npx wrangler kv:namespace create OAUTH_KV 2>&1) || true
             echo "$CREATE_OUTPUT"
-            NEW_ID=$(echo "$CREATE_OUTPUT" | grep -oP 'id = "\K[^"]+')
+            # Extract the namespace ID from output like: id = "abc123def456"
+            NEW_ID=$(echo "$CREATE_OUTPUT" | sed -n 's/.*id = "\([^"]*\)".*/\1/p')
             if [ -z "$NEW_ID" ]; then
-              echo "::error::Failed to create OAUTH_KV namespace"
+              echo "::error::Failed to create OAUTH_KV namespace. Output: $CREATE_OUTPUT"
               exit 1
             fi
             echo "Created OAUTH_KV namespace: $NEW_ID"
