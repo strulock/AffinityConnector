@@ -3,13 +3,27 @@ import { createServer } from "./server.js";
 import { KVCache } from "./cache.js";
 import type { AffinityWebhookEvent } from "./affinity/types.js";
 import { verifyAccessJwt } from "./access.js";
+import { importEncryptionKey } from "./oauth/crypto.js";
+import { resolveToken } from "./oauth/provider.js";
+import {
+  handleOAuthMetadata,
+  handleRegister,
+  handleAuthorizeGet,
+  handleAuthorizePost,
+  handleToken,
+} from "./oauth/routes.js";
 
 export interface Env {
-  AFFINITY_API_KEY: string;
+  AFFINITY_API_KEY?: string;
   AFFINITY_V1_BASE_URL?: string;
   AFFINITY_V2_BASE_URL?: string;
   AFFINITY_CACHE: KVNamespace;
   AFFINITY_WEBHOOK_SECRET?: string;
+  // OAuth 2.1 per-user authentication.
+  // When configured, users provide their own Affinity API key via the OAuth authorize flow.
+  // Generate OAUTH_ENCRYPTION_KEY with: openssl rand -hex 32
+  OAUTH_KV?: KVNamespace;
+  OAUTH_ENCRYPTION_KEY?: string;
   // Cloudflare Access JWT validation (defense-in-depth for /mcp).
   // Set CLOUDFLARE_ACCESS_JWT_VALIDATION = true in wrangler.toml to enable.
   // When enabled, CLOUDFLARE_ACCESS_AUD (secret) and CLOUDFLARE_ACCESS_TEAM_DOMAIN (var)
@@ -51,11 +65,33 @@ export default {
       return handleMcp(request, env);
     }
 
+    // OAuth 2.1 endpoints
+    if (pathname === "/.well-known/oauth-authorization-server") {
+      return handleOAuthMetadata(request, env);
+    }
+    if (pathname === "/oauth/register") {
+      return handleRegister(request, env);
+    }
+    if (pathname === "/oauth/authorize") {
+      if (request.method === "POST") return handleAuthorizePost(request, env);
+      return handleAuthorizeGet(request, env);
+    }
+    if (pathname === "/oauth/token") {
+      return handleToken(request, env);
+    }
+
     // MCP auth discovery endpoint (RFC 9728).
-    // No authorization_servers means no OAuth required.
     if (pathname === "/.well-known/oauth-protected-resource") {
       const { origin } = new URL(request.url);
-      return Response.json({ resource: origin }, { headers: CORS_HEADERS });
+      const oauthEnabled = !!(env.OAUTH_KV && env.OAUTH_ENCRYPTION_KEY);
+      return Response.json({
+        resource: origin,
+        ...(oauthEnabled ? {
+          authorization_servers: [origin],
+          bearer_methods_supported: ["header"],
+          scopes_supported: ["affinity"],
+        } : {}),
+      }, { headers: CORS_HEADERS });
     }
 
     if (pathname === "/health") {
@@ -132,25 +168,64 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
 }
 
 async function handleMcp(request: Request, env: Env): Promise<Response> {
-  if (!env.AFFINITY_API_KEY) {
-    return withCors(new Response("Server configuration error.", { status: 500 }));
-  }
-
+  // Defense-in-depth: Cloudflare Access JWT check (if enabled)
   if (env.CLOUDFLARE_ACCESS_JWT_VALIDATION) {
     if (!env.CLOUDFLARE_ACCESS_AUD || !env.CLOUDFLARE_ACCESS_TEAM_DOMAIN) {
       return withCors(new Response("Access JWT validation enabled but CLOUDFLARE_ACCESS_AUD or CLOUDFLARE_ACCESS_TEAM_DOMAIN is missing.", { status: 500 }));
     }
-    const token = request.headers.get("Cf-Access-Jwt-Assertion");
-    if (!token || !(await verifyAccessJwt(token, env.CLOUDFLARE_ACCESS_AUD, env.CLOUDFLARE_ACCESS_TEAM_DOMAIN))) {
+    const cfToken = request.headers.get("Cf-Access-Jwt-Assertion");
+    if (!cfToken || !(await verifyAccessJwt(cfToken, env.CLOUDFLARE_ACCESS_AUD, env.CLOUDFLARE_ACCESS_TEAM_DOMAIN))) {
       return withCors(new Response("Unauthorized", { status: 401 }));
     }
+  }
+
+  // Resolve the Affinity API key: per-user Bearer token or fallback to env
+  let apiKey: string | null = null;
+  const oauthEnabled = !!(env.OAUTH_KV && env.OAUTH_ENCRYPTION_KEY);
+
+  if (oauthEnabled) {
+    const authHeader = request.headers.get("Authorization");
+    const bearerToken = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+    if (bearerToken) {
+      const encKey = await importEncryptionKey(env.OAUTH_ENCRYPTION_KEY!);
+      apiKey = await resolveToken(env.OAUTH_KV!, encKey, bearerToken);
+      if (!apiKey) {
+        const { origin } = new URL(request.url);
+        return withCors(new Response("Unauthorized", {
+          status: 401,
+          headers: {
+            "WWW-Authenticate": `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource"`,
+          },
+        }));
+      }
+    }
+  }
+
+  // Fallback to shared API key if no Bearer token resolved
+  if (!apiKey) {
+    apiKey = env.AFFINITY_API_KEY ?? null;
+  }
+
+  if (!apiKey) {
+    // No Bearer token and no fallback key — tell the client to authenticate
+    if (oauthEnabled) {
+      const { origin } = new URL(request.url);
+      return withCors(new Response("Unauthorized", {
+        status: 401,
+        headers: {
+          "WWW-Authenticate": `Bearer resource_metadata="${origin}/.well-known/oauth-protected-resource"`,
+        },
+      }));
+    }
+    return withCors(new Response("Server configuration error.", { status: 500 }));
   }
 
   const transport = new WebStandardStreamableHTTPServerTransport({
     // Stateless mode: no sessionIdGenerator. Each request is independent.
   });
 
-  const server = createServer(env.AFFINITY_API_KEY, {
+  const server = createServer(apiKey, {
     v1BaseUrl: env.AFFINITY_V1_BASE_URL,
     v2BaseUrl: env.AFFINITY_V2_BASE_URL,
     cache: env.AFFINITY_CACHE,
