@@ -23,10 +23,9 @@ binding = "AFFINITY_CACHE"
 id = "1413d1000c9a4911acae52b3ce49aaa8"
 
 # OAuth 2.1 per-user authentication.
-# The OAUTH_KV namespace ID is injected by CI (see .github/workflows/deploy.yml).
 [[kv_namespaces]]
 binding = "OAUTH_KV"
-id = "OAUTH_KV_NAMESPACE_ID"
+id = "e816809d8c3e41b9b50f648f16140461"
 
 # Secrets (set via CI or wrangler secret put <NAME>)
 # AFFINITY_API_KEY          — shared Affinity API key (optional when OAuth is enabled)
