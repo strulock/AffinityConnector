@@ -311,6 +311,85 @@ describe('POST /mcp — OAuth Bearer token handling', () => {
   });
 });
 
+describe('POST /mcp — Analytics Engine', () => {
+  function makeAnalyticsMock() {
+    return { writeDataPoint: vi.fn() };
+  }
+
+  function makeEnvWithAnalytics(overrides?: Record<string, unknown>) {
+    return { AFFINITY_API_KEY: 'test-key', AFFINITY_CACHE: undefined, ANALYTICS: makeAnalyticsMock(), ...overrides };
+  }
+
+  it('does not throw when ANALYTICS binding is absent', async () => {
+    const res = await worker.fetch(makeRequest('POST', '/mcp'), makeEnv('test-key'), {} as never);
+    expect(res.status).toBe(200);
+  });
+
+  it('calls writeDataPoint once per /mcp request', async () => {
+    const env = makeEnvWithAnalytics() as { ANALYTICS: { writeDataPoint: ReturnType<typeof vi.fn> } };
+    await worker.fetch(makeRequest('POST', '/mcp'), env, {} as never);
+    expect(env.ANALYTICS.writeDataPoint).toHaveBeenCalledTimes(1);
+  });
+
+  it('records method and empty tool name for tools/list', async () => {
+    const env = makeEnvWithAnalytics() as { ANALYTICS: { writeDataPoint: ReturnType<typeof vi.fn> } };
+    const req = new Request('https://affinity.trulock.com/mcp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }),
+    });
+    await worker.fetch(req, env, {} as never);
+    const [event] = env.ANALYTICS.writeDataPoint.mock.calls[0] as [{ blobs: string[]; doubles: number[]; indexes: string[] }];
+    expect(event.blobs[0]).toBe('tools/list');
+    expect(event.blobs[1]).toBe('');
+    expect(event.indexes[0]).toBe('tools/list');
+  });
+
+  it('records tool name for tools/call', async () => {
+    const env = makeEnvWithAnalytics() as { ANALYTICS: { writeDataPoint: ReturnType<typeof vi.fn> } };
+    const req = new Request('https://affinity.trulock.com/mcp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'search_people', arguments: {} } }),
+    });
+    await worker.fetch(req, env, {} as never);
+    const [event] = env.ANALYTICS.writeDataPoint.mock.calls[0] as [{ blobs: string[]; doubles: number[]; indexes: string[] }];
+    expect(event.blobs[0]).toBe('tools/call');
+    expect(event.blobs[1]).toBe('search_people');
+    expect(event.indexes[0]).toBe('search_people');
+  });
+
+  it('records shared_key auth method when no OAuth', async () => {
+    const env = makeEnvWithAnalytics() as { ANALYTICS: { writeDataPoint: ReturnType<typeof vi.fn> } };
+    await worker.fetch(makeRequest('POST', '/mcp'), env, {} as never);
+    const [event] = env.ANALYTICS.writeDataPoint.mock.calls[0] as [{ blobs: string[] }];
+    expect(event.blobs[2]).toBe('shared_key');
+  });
+
+  it('records duration and status code in doubles', async () => {
+    const env = makeEnvWithAnalytics() as { ANALYTICS: { writeDataPoint: ReturnType<typeof vi.fn> } };
+    await worker.fetch(makeRequest('POST', '/mcp'), env, {} as never);
+    const [event] = env.ANALYTICS.writeDataPoint.mock.calls[0] as [{ doubles: number[] }];
+    expect(event.doubles[0]).toBeGreaterThanOrEqual(0);  // duration_ms
+    expect(event.doubles[1]).toBe(200);                  // status code
+  });
+
+  it('does not call writeDataPoint when request body is not JSON', async () => {
+    const env = makeEnvWithAnalytics() as { ANALYTICS: { writeDataPoint: ReturnType<typeof vi.fn> } };
+    const req = new Request('https://affinity.trulock.com/mcp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain' },
+      body: 'not-json',
+    });
+    // Should still complete — analytics fields just fall back to empty strings
+    const res = await worker.fetch(req, env, {} as never);
+    expect(res.status).toBe(200);
+    const [event] = env.ANALYTICS.writeDataPoint.mock.calls[0] as [{ blobs: string[] }];
+    expect(event.blobs[0]).toBe('');
+    expect(event.blobs[1]).toBe('');
+  });
+});
+
 describe('OAuth discovery with OAuth enabled', () => {
   it('includes authorization_servers when OAuth is configured', async () => {
     const env = {

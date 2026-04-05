@@ -31,6 +31,10 @@ export interface Env {
   CLOUDFLARE_ACCESS_JWT_VALIDATION?: boolean;
   CLOUDFLARE_ACCESS_AUD?: string;
   CLOUDFLARE_ACCESS_TEAM_DOMAIN?: string;
+  // Analytics Engine — records one data point per /mcp request.
+  // Bind via [[analytics_engine_datasets]] in wrangler.toml. Optional: omitting the
+  // binding silently disables analytics so local dev and tests work without it.
+  ANALYTICS?: AnalyticsEngineDataset;
 }
 
 // Claude.ai connects from the browser, so CORS is required.
@@ -168,6 +172,22 @@ async function handleWebhook(request: Request, env: Env): Promise<Response> {
 }
 
 async function handleMcp(request: Request, env: Env): Promise<Response> {
+  const startMs = Date.now();
+
+  // Peek at the JSON-RPC body to extract method and tool name for analytics.
+  // Clone first so the transport still receives the original readable stream.
+  let mcpMethod: string | undefined;
+  let toolName: string | undefined;
+  if (request.method === 'POST') {
+    try {
+      const body = await request.clone().json() as { method?: string; params?: { name?: string } };
+      mcpMethod = body.method;
+      if (mcpMethod === 'tools/call') toolName = body.params?.name;
+    } catch {
+      // Not JSON or empty body — analytics fields remain undefined
+    }
+  }
+
   // Defense-in-depth: Cloudflare Access JWT check (if enabled)
   if (env.CLOUDFLARE_ACCESS_JWT_VALIDATION) {
     if (!env.CLOUDFLARE_ACCESS_AUD || !env.CLOUDFLARE_ACCESS_TEAM_DOMAIN) {
@@ -181,6 +201,7 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
 
   // Resolve the Affinity API key: per-user Bearer token or fallback to env
   let apiKey: string | null = null;
+  let authMethod = 'shared_key';
   const oauthEnabled = !!(env.OAUTH_KV && env.OAUTH_ENCRYPTION_KEY);
 
   if (oauthEnabled) {
@@ -199,6 +220,7 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
           },
         }));
       }
+      authMethod = 'oauth';
     }
   }
 
@@ -232,5 +254,21 @@ async function handleMcp(request: Request, env: Env): Promise<Response> {
   });
   await server.connect(transport);
 
-  return withCors(await transport.handleRequest(request));
+  const mcpResponse = await transport.handleRequest(request);
+
+  if (env.ANALYTICS) {
+    env.ANALYTICS.writeDataPoint({
+      // blobs[0]: JSON-RPC method (e.g. "tools/call", "tools/list", "initialize")
+      // blobs[1]: tool name when method is tools/call (e.g. "search_people"), else ""
+      // blobs[2]: how the API key was resolved ("oauth" or "shared_key")
+      blobs: [mcpMethod ?? '', toolName ?? '', authMethod],
+      // doubles[0]: wall-clock latency in ms
+      // doubles[1]: HTTP response status code
+      doubles: [Date.now() - startMs, mcpResponse.status],
+      // index: primary filter key for Analytics Engine SQL queries
+      indexes: [toolName || mcpMethod || ''],
+    });
+  }
+
+  return withCors(mcpResponse);
 }
