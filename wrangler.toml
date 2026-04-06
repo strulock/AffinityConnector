@@ -27,6 +27,11 @@ id = "1413d1000c9a4911acae52b3ce49aaa8"
 binding = "OAUTH_KV"
 id = "e816809d8c3e41b9b50f648f16140461"
 
+# Analytics Engine — tracks MCP tool calls (method, tool name, auth method, duration, status)
+[[analytics_engine_datasets]]
+binding = "ANALYTICS"
+dataset = "mcp_calls"
+
 # Secrets (set via CI or wrangler secret put <NAME>)
 # AFFINITY_API_KEY          — shared Affinity API key (optional when OAuth is enabled)
 # OAUTH_ENCRYPTION_KEY      — 256-bit hex AES key for encrypting user API keys at rest
