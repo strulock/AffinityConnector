@@ -100,8 +100,13 @@ export class FieldsApi {
       q,
       'v2',
     );
+    if (!Array.isArray(result?.data)) {
+      throw new Error(
+        `Unexpected response shape from /v2/lists/${listId}/fields/field-${fieldId}/dropdown-options: missing data array`,
+      );
+    }
     return {
-      options: result.data ?? [],
+      options: result.data,
       nextCursor: extractCursor(result.pagination?.nextUrl),
     };
   }

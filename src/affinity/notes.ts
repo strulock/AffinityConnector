@@ -127,8 +127,13 @@ export class NotesApi {
       q,
       'v2',
     );
+    if (!Array.isArray(result?.data)) {
+      throw new Error(
+        `Unexpected response shape from /v2/notes/${noteId}/${segment}: missing data array`,
+      );
+    }
     return {
-      entities: result.data ?? [],
+      entities: result.data,
       nextCursor: extractCursor(result.pagination?.nextUrl),
     };
   }

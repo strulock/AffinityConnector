@@ -217,12 +217,11 @@ describe('FieldsApi.getDropdownOptions', () => {
     expect(url).toContain('cursor=tok-prev');
   });
 
-  it('returns empty array when data is missing', async () => {
+  it('throws when response is missing data array (rather than masking as empty)', async () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
       new Response(JSON.stringify({}), { status: 200 })
     ));
     const api = new FieldsApi(new AffinityClient('key'));
-    const result = await api.getDropdownOptions(1, 2);
-    expect(result.options).toEqual([]);
+    await expect(api.getDropdownOptions(1, 2)).rejects.toThrow(/Unexpected response shape/);
   });
 });
