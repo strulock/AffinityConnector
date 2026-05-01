@@ -2,7 +2,21 @@
 
 import { AffinityClient } from './client.js';
 import { CACHE_TTL, stableKey } from '../cache.js';
-import type { AffinityNote, AffinityNoteReply, AffinityPaginatedResponse } from './types.js';
+import { extractCursor } from './pagination.js';
+import type {
+  AffinityNote,
+  AffinityNoteReply,
+  AffinityPaginatedResponse,
+  AffinityNoteAttachedEntity,
+  AffinityCursorPaginatedResponse,
+} from './types.js';
+
+/** v2 path segment used for attached-entities lookups. Maps numeric type codes to v2 path parts. */
+const ATTACHED_ENTITY_PATH: Record<number, string> = {
+  0: 'attached-persons',
+  1: 'attached-companies',
+  8: 'attached-opportunities',
+};
 
 export class NotesApi {
   constructor(private client: AffinityClient) {}
@@ -89,5 +103,33 @@ export class NotesApi {
   async deleteNote(noteId: number): Promise<void> {
     await this.client.del<{ success: boolean }>(`/notes/${noteId}`);
     await this.client.cache.deleteWithPrefix('notes:');
+  }
+
+  /**
+   * Fetch entities directly attached to a note (v2).
+   * Dispatches to /v2/notes/{id}/attached-{persons|companies|opportunities}
+   * based on entityType (0/1/8).
+   */
+  async getAttachedEntities(
+    noteId: number,
+    entityType: 0 | 1 | 8,
+    params: { limit?: number; cursor?: string } = {},
+  ): Promise<{ entities: AffinityNoteAttachedEntity[]; nextCursor?: string }> {
+    const segment = ATTACHED_ENTITY_PATH[entityType];
+    if (!segment) throw new Error(`Unsupported entity type: ${entityType}`);
+
+    const { limit = 25, cursor } = params;
+    const q: Record<string, unknown> = { limit };
+    if (cursor) q.cursor = cursor;
+
+    const result = await this.client.get<AffinityCursorPaginatedResponse<AffinityNoteAttachedEntity>>(
+      `/notes/${noteId}/${segment}`,
+      q,
+      'v2',
+    );
+    return {
+      entities: result.data ?? [],
+      nextCursor: extractCursor(result.pagination?.nextUrl),
+    };
   }
 }

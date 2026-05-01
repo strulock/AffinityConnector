@@ -217,3 +217,51 @@ describe('delete_note tool', () => {
     expect(result.content[0].text).toContain('Not found:');
   });
 });
+
+describe('get_entities_attached_to_note tool', () => {
+  it('formats persons with name and email', async () => {
+    const { callTool } = setupNotes({
+      data: [
+        { id: 100, type: 'person', firstName: 'Jane', lastName: 'Doe', primaryEmailAddress: 'jane@x.com' },
+        { id: 101, type: 'person', firstName: 'Bob', lastName: 'Smith' },
+      ],
+      pagination: { nextUrl: null },
+    });
+    const result = await callTool('get_entities_attached_to_note', { note_id: 42, entity_type: 0 });
+    const text = result.content[0].text;
+    expect(text).toContain('Note 42 → 2 attached person(s)');
+    expect(text).toContain('[person:100] Jane Doe <jane@x.com>');
+    expect(text).toContain('[person:101] Bob Smith');
+  });
+
+  it('formats organizations with name and domain', async () => {
+    const { callTool } = setupNotes({
+      data: [{ id: 200, type: 'company', name: 'Acme Corp', domain: 'acme.com' }],
+    });
+    const result = await callTool('get_entities_attached_to_note', { note_id: 42, entity_type: 1 });
+    expect(result.content[0].text).toContain('[organization:200] Acme Corp (acme.com)');
+  });
+
+  it('formats opportunities with name', async () => {
+    const { callTool } = setupNotes({
+      data: [{ id: 300, type: 'opportunity', name: 'Big Deal' }],
+    });
+    const result = await callTool('get_entities_attached_to_note', { note_id: 42, entity_type: 8 });
+    expect(result.content[0].text).toContain('[opportunity:300] Big Deal');
+  });
+
+  it('returns empty message when no entities attached', async () => {
+    const { callTool } = setupNotes({ data: [] });
+    const result = await callTool('get_entities_attached_to_note', { note_id: 42, entity_type: 0 });
+    expect(result.content[0].text).toContain('Note 42 has no attached person(s)');
+  });
+
+  it('surfaces nextCursor for pagination', async () => {
+    const { callTool } = setupNotes({
+      data: [{ id: 100, type: 'person', firstName: 'A', lastName: 'B' }],
+      pagination: { nextUrl: 'https://api.affinity.co/v2/notes/42/attached-persons?cursor=tok-xyz' },
+    });
+    const result = await callTool('get_entities_attached_to_note', { note_id: 42, entity_type: 0 });
+    expect(result.content[0].text).toContain('cursor: "tok-xyz"');
+  });
+});

@@ -175,3 +175,54 @@ describe('FieldsApi.getFieldValueChanges', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
+
+describe('FieldsApi.getDropdownOptions', () => {
+  const MOCK_OPTION = { id: 901, text: 'Initial Outreach', rank: 1, color: 'blue' };
+
+  it('hits /v2/lists/{listId}/fields/field-{fieldId}/dropdown-options', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: [MOCK_OPTION], pagination: { nextUrl: null } }), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new FieldsApi(new AffinityClient('key'));
+    const result = await api.getDropdownOptions(333573, 5526485);
+    expect(result.options).toEqual([MOCK_OPTION]);
+    expect(result.nextCursor).toBeUndefined();
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain('/v2/');
+    expect(url).toContain('/lists/333573/fields/field-5526485/dropdown-options');
+  });
+
+  it('returns nextCursor when pagination.nextUrl is present', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        data: [],
+        pagination: { nextUrl: 'https://api.affinity.co/v2/lists/1/fields/field-2/dropdown-options?cursor=tok-next' },
+      }), { status: 200 })
+    ));
+    const api = new FieldsApi(new AffinityClient('key'));
+    const result = await api.getDropdownOptions(1, 2);
+    expect(result.nextCursor).toBe('tok-next');
+  });
+
+  it('forwards cursor and limit query params', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: [] }), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new FieldsApi(new AffinityClient('key'));
+    await api.getDropdownOptions(1, 2, { limit: 50, cursor: 'tok-prev' });
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain('limit=50');
+    expect(url).toContain('cursor=tok-prev');
+  });
+
+  it('returns empty array when data is missing', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({}), { status: 200 })
+    ));
+    const api = new FieldsApi(new AffinityClient('key'));
+    const result = await api.getDropdownOptions(1, 2);
+    expect(result.options).toEqual([]);
+  });
+});

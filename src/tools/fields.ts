@@ -107,6 +107,34 @@ export function registerFieldTools(server: McpServer, api: FieldsApi): void {
   );
 
   server.tool(
+    'get_list_field_dropdown_options',
+    'List the valid dropdown options for a dropdown or ranked-dropdown field on a list. Call this BEFORE set_field_value or batch_set_field_values on a dropdown — pass the returned option ID as the value to avoid "not a valid option" rejections. The numeric field_id is the same one returned by get_field_definitions(scope="list").',
+    {
+      list_id: z.coerce.number().int().min(1).describe('List ID (from get_lists)'),
+      field_id: z.coerce.number().int().min(1).describe('Numeric field ID (from get_field_definitions, scope="list")'),
+      limit: z.coerce.number().int().min(1).max(100).default(100).describe('Max options to return per page'),
+      cursor: z.string().optional().describe('Pagination cursor from a previous call'),
+    },
+    async ({ list_id, field_id, limit, cursor }) => {
+      try {
+        const { options, nextCursor } = await api.getDropdownOptions(list_id, field_id, { limit, cursor });
+        if (options.length === 0) {
+          return {
+            content: [{ type: 'text', text: `No dropdown options found for field ${field_id} on list ${list_id}. Confirm the field is a dropdown or ranked-dropdown type.` }],
+          };
+        }
+        const lines = options.map(o => {
+          const rank = typeof o.rank === 'number' ? ` (rank ${o.rank})` : '';
+          return `  [option:${o.id}] "${o.text}"${rank}`;
+        });
+        let text = `${options.length} dropdown option(s) for field ${field_id} on list ${list_id}:\n\n${lines.join('\n')}`;
+        if (nextCursor) text += `\n\nMore available. Use cursor: "${nextCursor}"`;
+        return { content: [{ type: 'text', text }] };
+      } catch (e) { return toolError(e); }
+    }
+  );
+
+  server.tool(
     'get_field_value_changes',
     'Get the audit history of changes to a specific Affinity field. Shows who changed the value, to what, and when. Useful for tracking pipeline stage transitions and other field mutations over time.',
     {

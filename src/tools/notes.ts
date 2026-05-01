@@ -4,7 +4,20 @@ import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { NotesApi } from '../affinity/notes.js';
 import { toolError } from './_error.js';
-import type { AffinityNote } from '../affinity/types.js';
+import type { AffinityNote, AffinityNoteAttachedEntity } from '../affinity/types.js';
+
+function formatAttachedEntity(e: AffinityNoteAttachedEntity, entityType: 0 | 1 | 8): string {
+  if (entityType === 0) {
+    const name = [e.firstName, e.lastName].filter(Boolean).join(' ') || '(no name)';
+    const email = e.primaryEmailAddress ? ` <${e.primaryEmailAddress}>` : '';
+    return `  [person:${e.id}] ${name}${email}`;
+  }
+  if (entityType === 1) {
+    const domain = e.domain ? ` (${e.domain})` : '';
+    return `  [organization:${e.id}] ${e.name ?? '(no name)'}${domain}`;
+  }
+  return `  [opportunity:${e.id}] ${e.name ?? '(no name)'}`;
+}
 
 function formatNote(note: AffinityNote): string {
   const date = new Date(note.created_at).toLocaleDateString();
@@ -111,6 +124,32 @@ export function registerNotesTools(server: McpServer, api: NotesApi): void {
         return {
           content: [{ type: 'text', text: `Updated note [id:${note.id}].` }],
         };
+      } catch (e) { return toolError(e); }
+    }
+  );
+
+  server.tool(
+    'get_entities_attached_to_note',
+    'List entities (people, companies, or opportunities) directly attached to a note. Reverse of get_notes — use when you have a note ID and need its targets. Call once per entity_type if you want all three.',
+    {
+      note_id: z.coerce.number().int().min(1).describe('Note ID (from get_notes)'),
+      entity_type: z
+        .union([z.literal(0), z.literal(1), z.literal(8)])
+        .describe('Entity type to retrieve: 0 = person, 1 = organization, 8 = opportunity'),
+      limit: z.coerce.number().int().min(1).max(100).default(25).describe('Max entities per page'),
+      cursor: z.string().optional().describe('Pagination cursor from a previous call'),
+    },
+    async ({ note_id, entity_type, limit, cursor }) => {
+      try {
+        const { entities, nextCursor } = await api.getAttachedEntities(note_id, entity_type, { limit, cursor });
+        const typeLabel = entity_type === 0 ? 'person(s)' : entity_type === 1 ? 'organization(s)' : 'opportunity(ies)';
+        if (entities.length === 0) {
+          return { content: [{ type: 'text', text: `Note ${note_id} has no attached ${typeLabel}.` }] };
+        }
+        const lines = entities.map(e => formatAttachedEntity(e, entity_type));
+        let text = `Note ${note_id} → ${entities.length} attached ${typeLabel}:\n\n${lines.join('\n')}`;
+        if (nextCursor) text += `\n\nMore available. Use cursor: "${nextCursor}"`;
+        return { content: [{ type: 'text', text }] };
       } catch (e) { return toolError(e); }
     }
   );
