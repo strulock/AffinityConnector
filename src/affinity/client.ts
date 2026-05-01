@@ -81,6 +81,11 @@ export class AffinityClient {
     return this.apiRequest<T>("PUT", path, body, undefined, version);
   }
 
+  /** Issue a PATCH request with a JSON body. Defaults to v1. */
+  async patch<T>(path: string, body: unknown, version: "v1" | "v2" = "v1"): Promise<T> {
+    return this.apiRequest<T>("PATCH", path, body, undefined, version);
+  }
+
   /** Issue a DELETE request. Defaults to v1. */
   async del<T>(path: string, version: "v1" | "v2" = "v1"): Promise<T> {
     return this.apiRequest<T>("DELETE", path, undefined, undefined, version);

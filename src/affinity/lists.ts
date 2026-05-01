@@ -96,7 +96,7 @@ export class ListsApi {
 
   /**
    * Batch update up to 100 fields on a single list entry (v2).
-   * POST /v2/lists/{listId}/list-entries/{listEntryId}/fields with operation: update-fields
+   * PATCH /v2/lists/{listId}/entries/{listEntryId}/fields with operation: update-fields
    * Requires "Export data from Lists" permission.
    */
   async batchSetFieldValues(
@@ -104,8 +104,8 @@ export class ListsApi {
     listEntryId: number,
     fields: Array<{ field_id: number; value: unknown }>,
   ): Promise<AffinityFieldValue[]> {
-    const result = await this.client.post<{ data: AffinityFieldValue[] }>(
-      `/lists/${listId}/list-entries/${listEntryId}/fields`,
+    const result = await this.client.patch<{ data: AffinityFieldValue[] }>(
+      `/lists/${listId}/entries/${listEntryId}/fields`,
       { operation: 'update-fields', fields },
       'v2',
     );
@@ -131,7 +131,9 @@ export class ListsApi {
     }
     if (allEntryIds.length === 0) return [];
 
-    // Fetch field values per entry in parallel batches of 10
+    // Fetch field values per entry in parallel batches of 10.
+    // The v1 /field-values endpoint ignores `field_id` as a filter — it only
+    // filters by entity/list_entry — so we filter client-side after fetching.
     const BATCH_SIZE = 10;
     const allValues: AffinityFieldValue[] = [];
     for (let i = 0; i < allEntryIds.length; i += BATCH_SIZE) {
@@ -140,9 +142,9 @@ export class ListsApi {
         batch.map(async (entryId) => {
           const raw = await this.client.get<AffinityFieldValue[]>('/field-values', {
             list_entry_id: entryId,
-            field_id: fieldId,
           });
-          return Array.isArray(raw) ? raw : [];
+          if (!Array.isArray(raw)) return [];
+          return raw.filter((v) => v.field_id === fieldId);
         }),
       );
       for (const values of results) allValues.push(...values);
