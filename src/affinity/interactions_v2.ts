@@ -27,13 +27,16 @@ function buildParams(params: CommonParams): Record<string, unknown> {
   const { limit = 25, page_token, person_id, organization_id, created_after, created_before } = params;
   const q: Record<string, unknown> = { limit };
   if (page_token) q.cursor = page_token;
-  // v2 uses filter strings, not direct query params for entity filtering
+  // v2 uses a single filter string with clauses joined by ' & ' (logical AND
+  // with surrounding whitespace). A bare '&' is the URL query-string separator,
+  // not the v2 AND operator, so unspaced joining gets parsed as multiple query
+  // params and silently drops every clause after the first.
   const filters: string[] = [];
   if (person_id != null) filters.push(`person_id=${person_id}`);
   if (organization_id != null) filters.push(`organization_id=${organization_id}`);
   if (created_after) filters.push(`createdAt>=${created_after}`);
   if (created_before) filters.push(`createdAt<=${created_before}`);
-  if (filters.length) q.filter = filters.join('&');
+  if (filters.length) q.filter = filters.join(' & ');
   return q;
 }
 
