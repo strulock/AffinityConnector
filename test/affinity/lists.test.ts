@@ -180,29 +180,38 @@ describe('ListsApi.setFieldValue', () => {
 });
 
 describe('ListsApi.getFieldValuesByList', () => {
-  it('fetches list entries then queries field values per entry', async () => {
+  it('fetches list entries then queries field values per entry, filtering by field_id client-side', async () => {
+    const otherFieldValue: AffinityFieldValue = {
+      id: 201,
+      field_id: 99,
+      entity_type: 1,
+      entity_id: 10,
+      list_entry_id: 100,
+      value: 'unrelated',
+    };
     let callNum = 0;
     const fetchMock = vi.fn().mockImplementation(() => {
       callNum++;
       if (callNum === 1) {
-        // First call: getListEntries
         return Promise.resolve(new Response(JSON.stringify({
           list_entries: [{ id: 100, list_id: 1, entity_id: 10, entity_type: 1, created_at: '', entity: {} }],
           next_page_token: null,
         }), { status: 200 }));
       }
-      // Second call: getFieldValues for entry 100
-      return Promise.resolve(new Response(JSON.stringify([MOCK_FIELD_VALUE]), { status: 200 }));
+      // The v1 /field-values endpoint ignores field_id and returns every value
+      // attached to the list entry; the wrapper must filter client-side.
+      return Promise.resolve(new Response(JSON.stringify([MOCK_FIELD_VALUE, otherFieldValue]), { status: 200 }));
     });
     vi.stubGlobal('fetch', fetchMock);
     const api = new ListsApi(new AffinityClient('key'));
     const result = await api.getFieldValuesByList(1, 5);
     expect(result).toEqual([MOCK_FIELD_VALUE]);
-    // Should have called list-entries first, then field-values with list_entry_id
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const fieldValuesUrl = fetchMock.mock.calls[1][0] as string;
     expect(fieldValuesUrl).toContain('list_entry_id=100');
-    expect(fieldValuesUrl).toContain('field_id=5');
+    // field_id is intentionally NOT in the request — Affinity v1 ignores it
+    // as a filter, so sending it is misleading. Filtering happens client-side.
+    expect(fieldValuesUrl).not.toContain('field_id=');
   });
 
   it('returns empty array when list has no entries', async () => {
@@ -373,7 +382,7 @@ describe('ListsApi.getSavedViewEntries', () => {
 });
 
 describe('ListsApi.batchSetFieldValues', () => {
-  it('POSTs to /v2/lists/{id}/list-entries/{entryId}/fields and returns data array', async () => {
+  it('PATCHes /v2/lists/{id}/entries/{entryId}/fields and returns data array', async () => {
     const updatedFields = [
       { id: 301, field_id: 5, entity_type: 1, entity_id: 10, list_entry_id: 101, value: 'Series B' },
     ];
@@ -386,8 +395,9 @@ describe('ListsApi.batchSetFieldValues', () => {
     expect(result).toEqual(updatedFields);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toContain('/v2/');
-    expect(url).toContain('/lists/1/list-entries/101/fields');
-    expect((init as RequestInit).method).toBe('POST');
+    expect(url).toContain('/lists/1/entries/101/fields');
+    expect(url).not.toContain('/list-entries/');
+    expect((init as RequestInit).method).toBe('PATCH');
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.operation).toBe('update-fields');
     expect(body.fields).toEqual([{ field_id: 5, value: 'Series B' }]);
