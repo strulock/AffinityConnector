@@ -268,4 +268,12 @@ describe('NotesApi.getAttachedEntities', () => {
     expect(url).toContain('limit=50');
     expect(url).toContain('cursor=tok-prev');
   });
+
+  it('throws when response is missing data array (rather than masking as empty)', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({}), { status: 200 })
+    ));
+    const api = new NotesApi(new AffinityClient('key'));
+    await expect(api.getAttachedEntities(42, 0)).rejects.toThrow(/Unexpected response shape/);
+  });
 });
