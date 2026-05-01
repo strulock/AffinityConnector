@@ -14,26 +14,29 @@ import type {
 } from './types.js';
 
 type CommonParams = {
-  person_id?: number;
-  organization_id?: number;
   created_after?: string;
   created_before?: string;
   limit?: number;
   page_token?: string;
 };
 
-/** Normalise CommonParams into the query-param shape the v2 API expects. */
+/**
+ * Normalise CommonParams into the v2 query-param shape.
+ *
+ * Affinity v2 filter language only accepts a fixed set of fields per endpoint
+ * (meetings: id, startTime, createdAt, updatedAt). `person_id` and
+ * `organization_id` are NOT valid filter fields — passing them yielded a 404
+ * on every call. Entity-scoped queries are not supported by these endpoints;
+ * use get_activity_timeline for entity-scoped interaction history.
+ */
 function buildParams(params: CommonParams): Record<string, unknown> {
-  const { limit = 25, page_token, person_id, organization_id, created_after, created_before } = params;
+  const { limit = 25, page_token, created_after, created_before } = params;
   const q: Record<string, unknown> = { limit };
   if (page_token) q.cursor = page_token;
-  // v2 uses filter strings, not direct query params for entity filtering
   const filters: string[] = [];
-  if (person_id != null) filters.push(`person_id=${person_id}`);
-  if (organization_id != null) filters.push(`organization_id=${organization_id}`);
   if (created_after) filters.push(`createdAt>=${created_after}`);
   if (created_before) filters.push(`createdAt<=${created_before}`);
-  if (filters.length) q.filter = filters.join('&');
+  if (filters.length) q.filter = filters.join(' & ');
   return q;
 }
 

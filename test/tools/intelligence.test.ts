@@ -4,7 +4,6 @@ import { IntelligenceApi } from '../../src/affinity/intelligence.js';
 import { PeopleApi } from '../../src/affinity/people.js';
 import { OrganizationsApi } from '../../src/affinity/organizations.js';
 import { NotesApi } from '../../src/affinity/notes.js';
-import { InteractionsV2Api } from '../../src/affinity/interactions_v2.js';
 import { UtilityApi } from '../../src/affinity/utility.js';
 import { registerIntelligenceTools } from '../../src/tools/intelligence.js';
 import { makeMockServer } from '../helpers/mock-server.js';
@@ -48,9 +47,8 @@ function setupTools(fetchSequence: unknown[], utilityApi?: UtilityApi) {
   const peopleApi = new PeopleApi(client);
   const orgsApi = new OrganizationsApi(client);
   const notesApi = new NotesApi(client);
-  const interactionsV2Api = new InteractionsV2Api(client);
   const { server, callTool } = makeMockServer();
-  registerIntelligenceTools(server, intelligenceApi, peopleApi, orgsApi, notesApi, interactionsV2Api, utilityApi ?? makeMockUtilityApi());
+  registerIntelligenceTools(server, intelligenceApi, peopleApi, orgsApi, notesApi, utilityApi ?? makeMockUtilityApi());
   return { callTool };
 }
 
@@ -133,7 +131,7 @@ describe('find_intro_path tool', () => {
     }));
     const client = new AffinityClient('key');
     const { server, callTool } = makeMockServer();
-    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client), makeMockUtilityApi());
+    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), makeMockUtilityApi());
     const result = await callTool('find_intro_path', { person_id: 1 });
     // Should not throw — connector shown with 0/100
     expect(result.content[0].text).toContain('/100');
@@ -151,7 +149,7 @@ describe('find_intro_path tool', () => {
     }));
     const client = new AffinityClient('key');
     const { server, callTool } = makeMockServer();
-    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client), makeMockUtilityApi());
+    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), makeMockUtilityApi());
     const result = await callTool('find_intro_path', { person_id: 1 });
     // Falls back to "Person {id}"
     expect(result.content[0].text).toContain('Person 2');
@@ -162,7 +160,7 @@ describe('find_intro_path tool', () => {
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 404 })));
     const client = new AffinityClient('key');
     const { server, callTool } = makeMockServer();
-    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client), makeMockUtilityApi());
+    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), makeMockUtilityApi());
     const result = await callTool('find_intro_path', { person_id: 999 });
     expect(result.content[0].text).toContain('not found');
     expect(result.content[0].text).toContain('999');
@@ -183,7 +181,7 @@ describe('find_intro_path tool', () => {
     }));
     const client = new AffinityClient('key');
     const { server, callTool } = makeMockServer();
-    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client), makeMockUtilityApi());
+    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), makeMockUtilityApi());
     const result = await callTool('find_intro_path', { person_id: 1 });
     const text = result.content[0].text;
     expect(text).toContain('Bob Jones');
@@ -212,28 +210,23 @@ describe('summarize_relationship tool', () => {
     expect(result.content[0].text).toContain('Provide either person_id or organization_id');
   });
 
-  it('aggregates person profile, strength, notes, and interactions', async () => {
+  it('aggregates person profile, strength, and notes', async () => {
     const { callTool } = setupTools([
       MOCK_PERSON,              // getById (profile)
       MOCK_STRENGTH_V1,         // getRelationshipStrength
       [],                       // getNotes
-      { data: [] },             // getEmails (v2)
-      { data: [] },             // getMeetings (v2)
     ]);
     const result = await callTool('summarize_relationship', { person_id: 1 });
     const text = result.content[0].text;
     expect(text).toContain('Alice Smith');
     expect(text).toContain('75/100');
     expect(text).toContain('Recent Notes');
-    expect(text).toContain('Recent Interactions');
   });
 
-  it('aggregates org profile, notes, and interactions (no strength for orgs)', async () => {
+  it('aggregates org profile and notes (no strength for orgs)', async () => {
     const { callTool } = setupTools([
       MOCK_ORG,              // getById (profile)
-      [],               // getNotes
-      { data: [] },     // getEmails (v2)
-      { data: [] },     // getMeetings (v2)
+      [],                    // getNotes
     ]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
     const text = result.content[0].text;
@@ -243,22 +236,13 @@ describe('summarize_relationship tool', () => {
 
   it('includes org notes when present', async () => {
     const note = { id: 1, person_ids: [], organization_ids: [10], opportunity_ids: [], creator_id: 99, content: 'Key account', type: 0, is_deleted: false, created_at: '2024-01-15T00:00:00Z' };
-    const { callTool } = setupTools([MOCK_ORG, [note], { data: [] }, { data: [] }]);
+    const { callTool } = setupTools([MOCK_ORG, [note]]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
     expect(result.content[0].text).toContain('Key account');
   });
 
-  it('includes org interactions when present (meeting type)', async () => {
-    const meeting = { id: 1, title: null, startTime: '2024-01-10T00:00:00Z', endTime: null, createdAt: '2024-01-10T00:00:00Z' };
-    const { callTool } = setupTools([MOCK_ORG, [], { data: [] }, { data: [meeting] }]);
-    const result = await callTool('summarize_relationship', { organization_id: 10 });
-    const text = result.content[0].text;
-    expect(text).toContain('Meeting');
-    expect(text).toContain('(no title)');
-  });
-
   it('skips relationship strength for org (not supported by API)', async () => {
-    const { callTool } = setupTools([MOCK_ORG, [], { data: [] }, { data: [] }]);
+    const { callTool } = setupTools([MOCK_ORG, []]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
     const text = result.content[0].text;
     expect(text).toContain('Acme');
@@ -272,72 +256,39 @@ describe('summarize_relationship tool', () => {
       call++;
       if (call === 1) return Promise.resolve(new Response(JSON.stringify(MOCK_PERSON), { status: 200 }));
       if (call === 2) return Promise.resolve(new Response('{}', { status: 404 }));
-      // getNotes returns [], getEmails returns {data:[]}, getMeetings returns {data:[]}
       return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
     }));
     const client = new AffinityClient('key');
     const { server, callTool } = makeMockServer();
-    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client), makeMockUtilityApi());
+    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), makeMockUtilityApi());
     const result = await callTool('summarize_relationship', { person_id: 1 });
-    // Should not throw — strength section simply omitted
     expect(result.content[0].text).toContain('Alice Smith');
   });
 
   it('includes note content when notes are present', async () => {
     const note = { id: 1, person_ids: [1], organization_ids: [], opportunity_ids: [], creator_id: 99, content: 'Very promising lead', type: 0, is_deleted: false, created_at: '2024-01-15T00:00:00Z' };
-    const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH_V1, [note], { data: [] }, { data: [] }]);
+    const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH_V1, [note]]);
     const result = await callTool('summarize_relationship', { person_id: 1 });
     expect(result.content[0].text).toContain('Very promising lead');
   });
 
-  it('includes interaction details when interactions are present', async () => {
-    const email = { id: 1, subject: 'Intro call', sentAt: '2024-01-10T00:00:00Z', createdAt: '2024-01-10T00:00:00Z' };
-    const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH_V1, [], { data: [email] }, { data: [] }]);
-    const result = await callTool('summarize_relationship', { person_id: 1 });
-    expect(result.content[0].text).toContain('Intro call');
-  });
-
-  it('includes meeting with title in person interactions', async () => {
-    const meeting = { id: 1, title: 'Strategy call', startTime: '2024-01-11T00:00:00Z', endTime: null, createdAt: '2024-01-11T00:00:00Z' };
-    const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH_V1, [], { data: [] }, { data: [meeting] }]);
-    const result = await callTool('summarize_relationship', { person_id: 1 });
-    expect(result.content[0].text).toContain('Strategy call');
-  });
-
-  it('shows fallback labels when person email subject and meeting title are null', async () => {
-    const email = { id: 3, subject: null, sentAt: '2024-01-08T00:00:00Z', createdAt: '2024-01-08T00:00:00Z' };
-    const meeting = { id: 2, title: null, startTime: '2024-01-09T00:00:00Z', endTime: null, createdAt: '2024-01-09T00:00:00Z' };
-    const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH_V1, [], { data: [email] }, { data: [meeting] }]);
-    const result = await callTool('summarize_relationship', { person_id: 1 });
-    const text = result.content[0].text;
-    expect(text).toContain('(no subject)');
-    expect(text).toContain('(no title)');
-  });
-
-  it('includes email in org interactions when present', async () => {
-    const email = { id: 2, subject: null, sentAt: '2024-01-09T00:00:00Z', createdAt: '2024-01-09T00:00:00Z' };
-    const { callTool } = setupTools([MOCK_ORG, [], { data: [email] }, { data: [] }]);
-    const result = await callTool('summarize_relationship', { organization_id: 10 });
-    expect(result.content[0].text).toContain('(no subject)');
-  });
-
   it('falls back to emails[0] when person primary_email is null', async () => {
     const personNoEmail = { ...MOCK_PERSON, primary_email: null, emails: ['secondary@example.com'] };
-    const { callTool } = setupTools([personNoEmail, MOCK_STRENGTH_V1, [], { data: [] }, { data: [] }]);
+    const { callTool } = setupTools([personNoEmail, MOCK_STRENGTH_V1, []]);
     const result = await callTool('summarize_relationship', { person_id: 1 });
     expect(result.content[0].text).toContain('secondary@example.com');
   });
 
   it('falls back to domains[0] when org domain is null', async () => {
     const orgNoDomain = { ...MOCK_ORG, domain: null, domains: ['fallback.com'] };
-    const { callTool } = setupTools([orgNoDomain, [], { data: [] }, { data: [] }]);
+    const { callTool } = setupTools([orgNoDomain, []]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
     expect(result.content[0].text).toContain('fallback.com');
   });
 
   it('shows "unknown" last activity for person when strength date is null', async () => {
     // v1 /relationships-strengths never returns last_activity_date, so it's always null → "unknown"
-    const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH_V1, [], { data: [] }, { data: [] }]);
+    const { callTool } = setupTools([MOCK_PERSON, MOCK_STRENGTH_V1, []]);
     const result = await callTool('summarize_relationship', { person_id: 1 });
     expect(result.content[0].text).toContain('unknown');
   });
@@ -352,12 +303,11 @@ describe('summarize_relationship tool', () => {
     }));
     const client = new AffinityClient('key');
     const { server, callTool } = makeMockServer();
-    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client), makeMockUtilityApi());
+    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), makeMockUtilityApi());
     await expect(callTool('summarize_relationship', { person_id: 1 })).rejects.toThrow();
   });
 
-  it('skips strength for org summarize and does not throw', async () => {
-    // Since org strength is now skipped entirely, 500 from notes/interactions should still propagate
+  it('propagates 500 errors from notes fetch on org summarize', async () => {
     let call = 0;
     vi.unstubAllGlobals();
     vi.stubGlobal('fetch', vi.fn().mockImplementation(() => {
@@ -367,13 +317,12 @@ describe('summarize_relationship tool', () => {
     }));
     const client = new AffinityClient('key');
     const { server, callTool } = makeMockServer();
-    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), new InteractionsV2Api(client), makeMockUtilityApi());
-    // getNotes (call 2) will 500 → should throw
+    registerIntelligenceTools(server, new IntelligenceApi(client), new PeopleApi(client), new OrganizationsApi(client), new NotesApi(client), makeMockUtilityApi());
     await expect(callTool('summarize_relationship', { organization_id: 10 })).rejects.toThrow();
   });
 
   it('shows org strength not available message', async () => {
-    const { callTool } = setupTools([MOCK_ORG, [], { data: [] }, { data: [] }]);
+    const { callTool } = setupTools([MOCK_ORG, []]);
     const result = await callTool('summarize_relationship', { organization_id: 10 });
     expect(result.content[0].text).toContain('Not available for organizations');
   });

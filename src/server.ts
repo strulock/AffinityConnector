@@ -61,7 +61,7 @@ export function createServer(apiKey: string, options?: AffinityClientOptions): M
   registerListTools(server, listsApi);
   registerNotesTools(server, notesApi);
   // Intelligence tools cross-reference people, orgs, and notes to build intro paths and summaries.
-  registerIntelligenceTools(server, intelligenceApi, peopleApi, orgsApi, notesApi, interactionsV2Api, utilityApi);
+  registerIntelligenceTools(server, intelligenceApi, peopleApi, orgsApi, notesApi, utilityApi);
   registerFieldTools(server, fieldsApi);
   registerOpportunityTools(server, opportunitiesApi);
   registerReminderTools(server, remindersApi, utilityApi);
@@ -72,7 +72,7 @@ export function createServer(apiKey: string, options?: AffinityClientOptions): M
   registerUtilityTools(server, utilityApi);
   registerWebhookTools(server, webhooksApi, client.cache, peopleApi, orgsApi);
   registerSearchAllTool(server, peopleApi, orgsApi, opportunitiesApi);
-  registerActivityTimelineTool(server, interactionsV2Api, notesApi);
+  registerActivityTimelineTool(server, notesApi);
 
   return server;
 }

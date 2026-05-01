@@ -31,11 +31,11 @@ function formatChatMessage(msg: AffinityChatMessageV2): string {
   return `[chat:${msg.id}] ${msg.sentAt}${snippet}`;
 }
 
+// Affinity v2 interaction endpoints don't support entity (person/org) filtering.
+// For entity-scoped queries, use get_activity_timeline.
 const COMMON_PARAMS = {
-  person_id: z.coerce.number().int().min(1).optional().describe('Filter by person ID'),
-  organization_id: z.coerce.number().int().min(1).optional().describe('Filter by organization ID'),
-  created_after: z.string().optional().describe('ISO 8601 timestamp — only return items created after this date'),
-  created_before: z.string().optional().describe('ISO 8601 timestamp — only return items created before this date'),
+  created_after: z.string().optional().describe('ISO 8601 timestamp — only return items created on or after this date'),
+  created_before: z.string().optional().describe('ISO 8601 timestamp — only return items created on or before this date'),
   limit: z.coerce.number().int().min(1).max(100).default(25).describe('Max items to return'),
   page_token: z.string().optional().describe('Pagination token from a previous call'),
 };
@@ -43,12 +43,12 @@ const COMMON_PARAMS = {
 export function registerInteractionsV2Tools(server: McpServer, api: InteractionsV2Api): void {
   server.tool(
     'get_emails',
-    'Get email interaction history from Affinity (v2). Richer than get_interactions — filter by person, org, or date range.',
+    'Get workspace-wide email interaction history from Affinity (v2). Filter by date range. For emails involving a specific person or organization, use get_activity_timeline instead.',
     COMMON_PARAMS,
-    async ({ person_id, organization_id, created_after, created_before, limit, page_token }) => {
+    async ({ created_after, created_before, limit, page_token }) => {
       try {
         const { emails, nextPageToken } = await api.getEmails({
-          person_id, organization_id, created_after, created_before, limit, page_token,
+          created_after, created_before, limit, page_token,
         });
         if (emails.length === 0) {
           return { content: [{ type: 'text', text: 'No emails found.' }] };
@@ -63,12 +63,12 @@ export function registerInteractionsV2Tools(server: McpServer, api: Interactions
 
   server.tool(
     'get_calls',
-    'Get call history from Affinity (v2). Calls are only available via the v2 API.',
+    'Get workspace-wide call history from Affinity (v2). Filter by date range. For calls involving a specific person or organization, use get_activity_timeline instead.',
     COMMON_PARAMS,
-    async ({ person_id, organization_id, created_after, created_before, limit, page_token }) => {
+    async ({ created_after, created_before, limit, page_token }) => {
       try {
         const { calls, nextPageToken } = await api.getCalls({
-          person_id, organization_id, created_after, created_before, limit, page_token,
+          created_after, created_before, limit, page_token,
         });
         if (calls.length === 0) {
           return { content: [{ type: 'text', text: 'No calls found.' }] };
@@ -83,12 +83,12 @@ export function registerInteractionsV2Tools(server: McpServer, api: Interactions
 
   server.tool(
     'get_meetings',
-    'Get meeting history from Affinity (v2). Returns richer metadata than the v1 get_interactions tool.',
+    'Get workspace-wide meeting history from Affinity (v2). Filter by date range. For meetings involving a specific person or organization, use get_activity_timeline instead.',
     COMMON_PARAMS,
-    async ({ person_id, organization_id, created_after, created_before, limit, page_token }) => {
+    async ({ created_after, created_before, limit, page_token }) => {
       try {
         const { meetings, nextPageToken } = await api.getMeetings({
-          person_id, organization_id, created_after, created_before, limit, page_token,
+          created_after, created_before, limit, page_token,
         });
         if (meetings.length === 0) {
           return { content: [{ type: 'text', text: 'No meetings found.' }] };
@@ -103,12 +103,12 @@ export function registerInteractionsV2Tools(server: McpServer, api: Interactions
 
   server.tool(
     'get_chat_messages',
-    'Get Slack/chat message history from Affinity (v2). Chat messages are only available via the v2 API.',
+    'Get workspace-wide Slack/chat message history from Affinity (v2). Filter by date range. For chats involving a specific person or organization, use get_activity_timeline instead.',
     COMMON_PARAMS,
-    async ({ person_id, organization_id, created_after, created_before, limit, page_token }) => {
+    async ({ created_after, created_before, limit, page_token }) => {
       try {
         const { messages, nextPageToken } = await api.getChatMessages({
-          person_id, organization_id, created_after, created_before, limit, page_token,
+          created_after, created_before, limit, page_token,
         });
         if (messages.length === 0) {
           return { content: [{ type: 'text', text: 'No chat messages found.' }] };

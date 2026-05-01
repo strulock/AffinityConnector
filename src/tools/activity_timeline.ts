@@ -1,32 +1,22 @@
-// MCP tool for unified activity timeline across emails, meetings, and notes.
+// MCP tool for an entity-scoped activity timeline (notes only).
+//
+// This previously also pulled emails and meetings via the v2 interaction endpoints,
+// but those endpoints don't accept person/organization filters — every entity-scoped
+// call returned 404 and was silently swallowed. The tool now reflects what the
+// underlying API actually supports.
 
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { InteractionsV2Api } from '../affinity/interactions_v2.js';
 import { NotesApi } from '../affinity/notes.js';
 import { toolError } from './_error.js';
-import { AffinityNotFoundError } from '../affinity/client.js';
-
-interface TimelineItem {
-  date: string;
-  type: 'Email' | 'Meeting' | 'Note';
-  label: string;
-}
-
-function meetingDuration(start: string, end: string | null): string {
-  if (!end) return '';
-  const mins = Math.round((new Date(end).getTime() - new Date(start).getTime()) / 60000);
-  return mins > 0 ? ` (${mins} min)` : '';
-}
 
 export function registerActivityTimelineTool(
   server: McpServer,
-  interactionsV2Api: InteractionsV2Api,
   notesApi: NotesApi,
 ): void {
   server.tool(
     'get_activity_timeline',
-    'Get a unified, chronologically sorted activity timeline for a person or organization — combines emails, meetings, and notes in a single view. Note: calls and chat messages are not included; use get_calls and get_chat_messages for those. Useful for pre-call prep or relationship reviews.',
+    'Get a chronologically sorted note timeline for a person or organization. (Emails, meetings, calls, and chat messages cannot be filtered by entity in the v2 API; for last-interaction summary stats see get_person / get_organization, and for workspace-wide interaction lists see get_emails / get_meetings / get_calls / get_chat_messages.)',
     {
       person_id: z.coerce.number().int().min(1).optional().describe('Person ID to fetch activity for'),
       organization_id: z.coerce.number().int().min(1).optional().describe('Organization ID to fetch activity for'),
@@ -39,60 +29,29 @@ export function registerActivityTimelineTool(
       }
 
       try {
-      const scope = { person_id, organization_id, limit };
+        const { notes } = await notesApi.getNotes({ person_id, organization_id, limit });
 
-      const [{ emails }, { meetings }, { notes }] = await Promise.all([
-        interactionsV2Api.getEmails(scope).catch((e: unknown) =>
-          e instanceof AffinityNotFoundError ? { emails: [] as const } : Promise.reject(e)
-        ),
-        interactionsV2Api.getMeetings(scope).catch((e: unknown) =>
-          e instanceof AffinityNotFoundError ? { meetings: [] as const } : Promise.reject(e)
-        ),
-        notesApi.getNotes(scope),
-      ]);
-
-      const items: TimelineItem[] = [
-        ...emails.map(e => ({
-          date: e.sentAt,
-          type: 'Email' as const,
-          label: `Subject: ${e.subject ?? '(no subject)'}`,
-        })),
-        ...meetings.map(m => ({
-          date: m.startTime,
-          type: 'Meeting' as const,
-          label: `${m.title ?? '(no title)'}${meetingDuration(m.startTime, m.endTime)}`,
-        })),
-        ...notes.map(n => ({
+        const items = notes.map(n => ({
           date: n.created_at,
-          type: 'Note' as const,
           label: n.content.slice(0, 120),
-        })),
-      ];
+        }));
+        const filtered = since ? items.filter(i => i.date >= since) : items;
+        filtered.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+        const limited = filtered.slice(0, limit);
 
-      const filtered = since
-        ? items.filter(item => item.date >= since)
-        : items;
+        if (limited.length === 0) {
+          return { content: [{ type: 'text', text: 'No activity found.' }] };
+        }
 
-      filtered.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
-      const limited = filtered.slice(0, limit);
-
-      if (limited.length === 0) {
-        return { content: [{ type: 'text', text: 'No activity found.' }] };
-      }
-
-      const scope_label = person_id != null ? `person ${person_id}` : `organization ${organization_id}`;
-      const since_label = since ? ` (since ${since})` : '';
-      const lines = limited.map(item => {
-        const day = item.date.slice(0, 10);
-        return `[${day} ${item.type}] ${item.label}`;
-      });
-
-      return {
-        content: [{
-          type: 'text',
-          text: `${limited.length} activity item(s) for ${scope_label}${since_label}:\n\n${lines.join('\n')}`,
-        }],
-      };
+        const scope_label = person_id != null ? `person ${person_id}` : `organization ${organization_id}`;
+        const since_label = since ? ` (since ${since})` : '';
+        const lines = limited.map(item => `[${item.date.slice(0, 10)} Note] ${item.label}`);
+        return {
+          content: [{
+            type: 'text',
+            text: `${limited.length} activity item(s) for ${scope_label}${since_label}:\n\n${lines.join('\n')}`,
+          }],
+        };
       } catch (e) { return toolError(e); }
     }
   );

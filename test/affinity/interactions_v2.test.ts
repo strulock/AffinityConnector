@@ -63,10 +63,33 @@ describe('InteractionsV2Api.getEmails', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
     const api = new InteractionsV2Api(new AffinityClient('key'));
-    await api.getEmails({ person_id: 5 });
+    await api.getEmails();
     const [url] = fetchMock.mock.calls[0] as [string];
     expect(url).toContain('/v2/');
     expect(url).toContain('/emails');
+  });
+
+  it('builds the createdAt filter from created_after / created_before', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ data: [], pagination: {} }), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new InteractionsV2Api(new AffinityClient('key'));
+    await api.getEmails({ created_after: '2024-01-01T00:00:00Z', created_before: '2024-12-31T23:59:59Z' });
+    const [url] = fetchMock.mock.calls[0] as [string];
+    const filter = new URL(url).searchParams.get('filter');
+    expect(filter).toBe('createdAt>=2024-01-01T00:00:00Z & createdAt<=2024-12-31T23:59:59Z');
+  });
+
+  it('does not send a filter param when no date filters are provided', async () => {
+    const fetchMock = vi.fn().mockImplementation(() =>
+      Promise.resolve(new Response(JSON.stringify({ data: [], pagination: {} }), { status: 200 }))
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new InteractionsV2Api(new AffinityClient('key'));
+    await api.getEmails();
+    const [url] = fetchMock.mock.calls[0] as [string];
+    expect(new URL(url).searchParams.get('filter')).toBeNull();
   });
 
   it('includes cursor in URL when page_token provided', async () => {
