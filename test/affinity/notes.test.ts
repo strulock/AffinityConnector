@@ -206,3 +206,66 @@ describe('NotesApi.deleteNote', () => {
     await expect(api.deleteNote(1)).resolves.toBeUndefined();
   });
 });
+
+describe('NotesApi.getAttachedEntities', () => {
+  it('hits /v2/notes/{id}/attached-persons for entity_type 0', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        data: [{ id: 100, type: 'person', firstName: 'Jane', lastName: 'Doe', primaryEmailAddress: 'jane@x.com' }],
+        pagination: { nextUrl: null },
+      }), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new NotesApi(new AffinityClient('key'));
+    const { entities, nextCursor } = await api.getAttachedEntities(42, 0);
+    expect(entities[0].firstName).toBe('Jane');
+    expect(nextCursor).toBeUndefined();
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain('/v2/');
+    expect(url).toContain('/notes/42/attached-persons');
+  });
+
+  it('hits /v2/notes/{id}/attached-companies for entity_type 1', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: [{ id: 200, name: 'Acme', domain: 'acme.com' }] }), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new NotesApi(new AffinityClient('key'));
+    await api.getAttachedEntities(42, 1);
+    expect(fetchMock.mock.calls[0][0]).toContain('/notes/42/attached-companies');
+  });
+
+  it('hits /v2/notes/{id}/attached-opportunities for entity_type 8', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: [{ id: 300, name: 'Big Deal' }] }), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new NotesApi(new AffinityClient('key'));
+    await api.getAttachedEntities(42, 8);
+    expect(fetchMock.mock.calls[0][0]).toContain('/notes/42/attached-opportunities');
+  });
+
+  it('returns nextCursor when pagination.nextUrl is present', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({
+        data: [],
+        pagination: { nextUrl: 'https://api.affinity.co/v2/notes/42/attached-persons?cursor=tok-xyz' },
+      }), { status: 200 })
+    ));
+    const api = new NotesApi(new AffinityClient('key'));
+    const { nextCursor } = await api.getAttachedEntities(42, 0);
+    expect(nextCursor).toBe('tok-xyz');
+  });
+
+  it('forwards cursor and limit query params', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ data: [] }), { status: 200 })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const api = new NotesApi(new AffinityClient('key'));
+    await api.getAttachedEntities(42, 0, { limit: 50, cursor: 'tok-prev' });
+    const url = fetchMock.mock.calls[0][0] as string;
+    expect(url).toContain('limit=50');
+    expect(url).toContain('cursor=tok-prev');
+  });
+});

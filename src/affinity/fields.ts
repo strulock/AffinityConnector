@@ -5,7 +5,13 @@
 
 import { AffinityClient } from './client.js';
 import { CACHE_TTL } from '../cache.js';
-import type { AffinityField, AffinityFieldValueChange } from './types.js';
+import { extractCursor } from './pagination.js';
+import type {
+  AffinityField,
+  AffinityFieldValueChange,
+  AffinityDropdownOption,
+  AffinityCursorPaginatedResponse,
+} from './types.js';
 
 export class FieldsApi {
   constructor(private client: AffinityClient) {}
@@ -71,5 +77,37 @@ export class FieldsApi {
       params
     );
     return Array.isArray(result) ? result : [];
+  }
+
+  /**
+   * List the valid dropdown options for a dropdown / ranked-dropdown field on a list (v2).
+   * GET /v2/lists/{listId}/fields/field-{fieldId}/dropdown-options
+   *
+   * The numeric `fieldId` is prefixed with `field-` because v2 path params expect
+   * the v2 field-ID format. Use the returned option ID when writing dropdown values.
+   */
+  async getDropdownOptions(
+    listId: number,
+    fieldId: number,
+    params: { limit?: number; cursor?: string } = {},
+  ): Promise<{ options: AffinityDropdownOption[]; nextCursor?: string }> {
+    const { limit = 100, cursor } = params;
+    const q: Record<string, unknown> = { limit };
+    if (cursor) q.cursor = cursor;
+
+    const result = await this.client.get<AffinityCursorPaginatedResponse<AffinityDropdownOption>>(
+      `/lists/${listId}/fields/field-${fieldId}/dropdown-options`,
+      q,
+      'v2',
+    );
+    if (!Array.isArray(result?.data)) {
+      throw new Error(
+        `Unexpected response shape from /v2/lists/${listId}/fields/field-${fieldId}/dropdown-options: missing data array`,
+      );
+    }
+    return {
+      options: result.data,
+      nextCursor: extractCursor(result.pagination?.nextUrl),
+    };
   }
 }

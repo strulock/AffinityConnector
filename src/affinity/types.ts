@@ -174,6 +174,27 @@ export interface AffinityNoteReply {
   created_at: string;
 }
 
+// v2 attached-entities response items. Persons use firstName/lastName,
+// companies use name+domain, opportunities use name. We accept all three
+// optionally so a single type covers every shape.
+export interface AffinityNoteAttachedEntity {
+  id: number;
+  type?: string;
+  name?: string;
+  firstName?: string;
+  lastName?: string;
+  primaryEmailAddress?: string | null;
+  domain?: string | null;
+}
+
+// v2 dropdown options on a list field
+export interface AffinityDropdownOption {
+  id: number;
+  text: string;
+  rank?: number | null;
+  color?: string | null;
+}
+
 export interface AffinityReminderEntity {
   id: number;
   name?: string;

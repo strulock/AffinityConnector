@@ -224,3 +224,48 @@ describe('get_field_value_changes tool', () => {
     expect(result.content[0].text).toContain('No value changes found for field 5');
   });
 });
+
+// ── get_list_field_dropdown_options ─────────────────────────────────────────
+
+describe('get_list_field_dropdown_options tool', () => {
+  function setupV2(body: unknown) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }))
+    );
+    const api = new FieldsApi(new AffinityClient('key'));
+    const { server, callTool } = makeMockServer();
+    registerFieldTools(server, api);
+    return { callTool };
+  }
+
+  it('formats option list with id, text, and rank', async () => {
+    const { callTool } = setupV2({
+      data: [
+        { id: 901, text: 'Initial Outreach', rank: 1 },
+        { id: 902, text: 'Prospect Identified', rank: 2 },
+      ],
+      pagination: { nextUrl: null },
+    });
+    const result = await callTool('get_list_field_dropdown_options', { list_id: 333573, field_id: 5526485 });
+    const text = result.content[0].text;
+    expect(text).toContain('2 dropdown option(s)');
+    expect(text).toContain('[option:901] "Initial Outreach" (rank 1)');
+    expect(text).toContain('[option:902] "Prospect Identified" (rank 2)');
+  });
+
+  it('returns guidance message when no options found', async () => {
+    const { callTool } = setupV2({ data: [] });
+    const result = await callTool('get_list_field_dropdown_options', { list_id: 1, field_id: 2 });
+    expect(result.content[0].text).toContain('No dropdown options found');
+  });
+
+  it('surfaces nextCursor when more pages exist', async () => {
+    const { callTool } = setupV2({
+      data: [{ id: 1, text: 'A' }],
+      pagination: { nextUrl: 'https://api.affinity.co/v2/lists/1/fields/field-2/dropdown-options?cursor=tok-xyz' },
+    });
+    const result = await callTool('get_list_field_dropdown_options', { list_id: 1, field_id: 2 });
+    expect(result.content[0].text).toContain('cursor: "tok-xyz"');
+  });
+});
